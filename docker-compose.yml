@@ -1,49 +1,37 @@
-version: '3.8'
-
 services:
-  #Сервис статистики (ЭТАП 1)
+
+  stats-db:
+    image: postgres:16.1
+    environment:
+      POSTGRES_DB: stats
+      POSTGRES_USER: stats
+      POSTGRES_PASSWORD: stats
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stats"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   stats-server:
     build: ./stats/stats-server
     container_name: stats-server-container
     ports:
       - "9090:9090"
     depends_on:
-      - stats-db
+      stats-db:
+        condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stats
-      - SPRING_DATASOURCE_USERNAME=stats
-      - SPRING_DATASOURCE_PASSWORD=stats
+      SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
+      SPRING_DATASOURCE_USERNAME: stats
+      SPRING_DATASOURCE_PASSWORD: stats
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  stats-db:
-    image: postgres:16.1
-    environment:
-      - POSTGRES_DB=stats
-      - POSTGRES_USER=stats
-      - POSTGRES_PASSWORD=stats
-
-  #будет реализован позже
-  main-service:
-    build: ./main-service
-    # ports:
-    #   - "8080:8080"
-
-  #будет реализован позже
-  # ewm-service:
-  #   build: ./main-service
-  #   container_name: ewm-service-container
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     - ewm-db
-  #   environment:
-  #     - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm
-  #     - SPRING_DATASOURCE_USERNAME=ewm
-  #     - SPRING_DATASOURCE_PASSWORD=ewm
-  #     - stats-service.url=http://stats-server:9090
-
-  # ewm-db:
-  #   image: postgres:16.1
-  #   environment:
-  #     - POSTGRES_DB=ewm
-  #     - POSTGRES_USER=ewm
-  #     - POSTGRES_PASSWORD=ewm
+  # Версия для этапа 1
+  ewm-service:
+    image: alpine:3.19
+    container_name: ewm-service
+    command: ["sh", "-c", "echo 'ewm-service disabled on stage 1' && sleep infinity"]
