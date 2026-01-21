@@ -14,11 +14,14 @@ services:
   stats-db:
     image: postgres:16.1
 
-  ewm-service:
-    extends: main-service
-
+  # Основной сервис
   main-service:
-    build: ewm-service
+    build: ./main-service
+    ports:
+      - "8080:8080"
+
+  ewm-service:
+    build: ./main-service  # Строится из той же директории
     container_name: ewm-service-container
     ports:
       - "8080:8080"
