@@ -34,4 +34,23 @@ public class StatsServiceImpl implements StatsService {
         }
         return repository.findStats(start, end);
     }
+
+    @Override
+    public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, boolean unique, List<String> uris) {
+        List<ViewStatsDto> stats;
+
+        if (unique) {
+            stats = repository.findUniqueStats(start, end);
+        } else {
+            stats = repository.findStats(start, end);
+        }
+
+        if (uris != null && !uris.isEmpty()) {
+            stats = stats.stream()
+                    .filter(s -> uris.contains(s.getUri()))
+                    .toList();
+        }
+
+        return stats;
+    }
 }

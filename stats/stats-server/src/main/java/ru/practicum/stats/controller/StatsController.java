@@ -30,8 +30,11 @@ public class StatsController {
             LocalDateTime end,
 
             @RequestParam(defaultValue = "false")
-            boolean unique
+            boolean unique,
+
+            @RequestParam(required = false)
+            List<String> uris
     ) {
-        return statsService.getStats(start, end, unique);
+        return statsService.getStats(start, end, unique, uris);
     }
 }
