@@ -13,7 +13,9 @@ services:
       retries: 5
 
   stats-server:
-    build: ./stats/stats-server
+    build:
+      context: .
+      dockerfile: stats/stats-server/Dockerfile
     container_name: stats-server-container
     ports:
       - "9090:9090"
@@ -30,8 +32,16 @@ services:
       timeout: 5s
       retries: 10
 
-  # Версия для этапа 1
   ewm-service:
-    image: alpine:3.19
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: ewm-service
-    command: ["sh", "-c", "echo 'ewm-service disabled on stage 1' && sleep infinity"]
+    ports:
+      - "9091:9090"
+    depends_on:
+      - stats-server
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
+      SPRING_DATASOURCE_USERNAME: stats
+      SPRING_DATASOURCE_PASSWORD: stats
