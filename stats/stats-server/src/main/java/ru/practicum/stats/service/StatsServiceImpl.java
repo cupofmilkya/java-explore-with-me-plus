@@ -2,6 +2,7 @@ package ru.practicum.stats.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.stats.model.EndpointHit;
@@ -19,6 +20,8 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public void saveHit(EndpointHitDto dto) {
+        // Простейшая защита от сохранения пустых записей
+        if (dto == null) return;
         EndpointHit hit = EndpointHitDtoMapper.toEntity(dto);
         repository.save(hit);
     }
@@ -29,28 +32,22 @@ public class StatsServiceImpl implements StatsService {
             LocalDateTime end,
             boolean unique
     ) {
-        if (unique) {
-            return repository.findUniqueStats(start, end);
-        }
-        return repository.findStats(start, end);
+        return unique
+                ? repository.findUniqueStats(start, end)
+                : repository.findStats(start, end);
     }
 
     @Override
     public List<ViewStatsDto> getStats(LocalDateTime start, LocalDateTime end, boolean unique, List<String> uris) {
-        List<ViewStatsDto> stats;
-
+        boolean filterByUris = !CollectionUtils.isEmpty(uris);
         if (unique) {
-            stats = repository.findUniqueStats(start, end);
+            return filterByUris
+                    ? repository.findUniqueStatsByUris(start, end, uris)
+                    : repository.findUniqueStats(start, end);
         } else {
-            stats = repository.findStats(start, end);
+            return filterByUris
+                    ? repository.findStatsByUris(start, end, uris)
+                    : repository.findStats(start, end);
         }
-
-        if (uris != null && !uris.isEmpty()) {
-            stats = stats.stream()
-                    .filter(s -> uris.contains(s.getUri()))
-                    .toList();
-        }
-
-        return stats;
     }
 }
