@@ -18,8 +18,10 @@ public class InMemoryStubStore {
 
     private final List<UserStubDto> users = Collections.synchronizedList(new ArrayList<>());
     private final List<EventStubDto> events = Collections.synchronizedList(new ArrayList<>());
+    private final List<CategoryStubDto> categories = Collections.synchronizedList(new ArrayList<>());
     private final AtomicLong userSeq = new AtomicLong(1);
     private final AtomicLong eventSeq = new AtomicLong(1);
+    private final AtomicLong categorySeq = new AtomicLong(1);
 
     @PostConstruct
     public void seed() {
@@ -58,5 +60,18 @@ public class InMemoryStubStore {
 
     public Optional<EventStubDto> getEventById(long id) {
         return events.stream().filter(e -> e.getId() == id).findFirst();
+    }
+
+    public CategoryStubDto createCategory(CategoryStubDto dto) {
+        CategoryStubDto created = CategoryStubDto.builder()
+                .id(categorySeq.getAndIncrement())
+                .name(dto.getName())
+                .build();
+        categories.add(created);
+        return created;
+    }
+
+    public List<CategoryStubDto> getCategories() {
+        return new ArrayList<>(categories);
     }
 }
