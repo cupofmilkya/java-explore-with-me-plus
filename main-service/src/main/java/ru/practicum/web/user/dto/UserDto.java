@@ -1,19 +1,8 @@
 package ru.practicum.web.user.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.Data;
 
-/**
- * Простейший DTO пользователя для нужд Postman-тестов.
- */
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Data
 public class UserDto {
     private Long id;
     private String name;
