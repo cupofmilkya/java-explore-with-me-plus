@@ -2,6 +2,7 @@ package ru.practicum.web.event.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ru.practicum.web.admin.entity.Category;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +19,10 @@ public class Event {
     private Long id;
 
     private String title;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
 
     private String annotation;
 
