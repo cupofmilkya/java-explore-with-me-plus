@@ -6,6 +6,8 @@ import ru.practicum.web.event.entity.Event;
 import java.util.List;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
+
     List<Event> findByStatus(Event.Status status);
+
     boolean existsByCategoryId(Long categoryId);
 }
