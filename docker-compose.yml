@@ -24,6 +24,10 @@ services:
       - stats-db-data:/var/lib/postgresql/data
 
   stats-service:
+    networks:
+      default:
+        aliases:
+          - stats-server
     build:
       context: .
       dockerfile: stats/stats-server/Dockerfile
