@@ -1,12 +1,13 @@
 package ru.practicum.web.admin.service;
 
 import ru.practicum.web.admin.dto.CategoryDto;
+import ru.practicum.web.admin.dto.NewCategoryDto;
 
 import java.util.List;
 
 public interface AdminCategoryService {
 
-    CategoryDto create(CategoryDto dto);
+    CategoryDto create(NewCategoryDto dto);
 
     CategoryDto update(Long id, CategoryDto dto);
 
