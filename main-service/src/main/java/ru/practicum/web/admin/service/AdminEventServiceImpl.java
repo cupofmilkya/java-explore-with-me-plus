@@ -1,12 +1,15 @@
-package ru.practicum.web.event.service;
+package ru.practicum.web.admin.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
 
 import jakarta.transaction.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -15,6 +18,7 @@ import java.util.List;
 public class AdminEventServiceImpl implements AdminEventService {
 
     private final EventRepository repository;
+    private final StatsClient statsClient;
 
     @Override
     public List<EventDto> getPendingEvents() {
@@ -28,6 +32,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     public EventDto publishEvent(Long id) {
         Event event = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+
         event.setStatus(Event.Status.PUBLISHED);
         return toDto(repository.save(event));
     }
@@ -36,6 +41,7 @@ public class AdminEventServiceImpl implements AdminEventService {
     public EventDto rejectEvent(Long id) {
         Event event = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+
         event.setStatus(Event.Status.CANCELED);
         return toDto(repository.save(event));
     }
@@ -47,6 +53,18 @@ public class AdminEventServiceImpl implements AdminEventService {
                 .annotation(event.getAnnotation())
                 .eventDate(event.getEventDate())
                 .status(event.getStatus().name())
+                .views(getViews(event))
                 .build();
+    }
+
+    private long getViews(Event event) {
+        var stats = statsClient.getStats(
+                event.getEventDate(),
+                LocalDateTime.now(),
+                List.of("/events/" + event.getId()),
+                true
+        );
+
+        return stats.isEmpty() ? 0 : stats.getFirst().getHits();
     }
 }

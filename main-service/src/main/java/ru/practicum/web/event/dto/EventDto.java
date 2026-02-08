@@ -11,4 +11,5 @@ public class EventDto {
     private String annotation;
     private LocalDateTime eventDate;
     private String status;
+    private Long views;
 }

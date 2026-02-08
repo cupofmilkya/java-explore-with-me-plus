@@ -1,10 +1,10 @@
-package ru.practicum.web.event.controller;
+package ru.practicum.web.admin.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.practicum.web.event.service.AdminEventService;
+import ru.practicum.web.admin.service.AdminEventService;
 import ru.practicum.web.event.dto.EventDto;
 
 import java.util.List;

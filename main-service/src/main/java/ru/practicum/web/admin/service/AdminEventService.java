@@ -1,4 +1,4 @@
-package ru.practicum.web.event.service;
+package ru.practicum.web.admin.service;
 
 import ru.practicum.web.event.dto.EventDto;
 
