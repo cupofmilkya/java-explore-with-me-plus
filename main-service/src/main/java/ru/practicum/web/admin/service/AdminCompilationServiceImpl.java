@@ -4,48 +4,63 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.admin.dto.CompilationDto;
+import ru.practicum.web.admin.dto.NewCompilationDto;
+import ru.practicum.web.admin.dto.UpdateCompilationRequest;
 import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.mapper.CompilationMapper;
 import ru.practicum.web.admin.repository.CompilationRepository;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import ru.practicum.web.exception.NotFoundException;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class AdminCompilationServiceImpl implements AdminCompilationService {
 
-    private final CompilationRepository repository;
+    private final CompilationRepository compilationRepository;
 
     @Override
-    public CompilationDto create(CompilationDto dto) {
-        Compilation compilation = CompilationMapper.toEntity(dto);
-        return CompilationMapper.toDto(repository.save(compilation));
-    }
-
-    @Override
-    public CompilationDto update(Long id, CompilationDto dto) {
-        Compilation compilation = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Compilation not found with id " + id));
+    @Transactional
+    public CompilationDto create(NewCompilationDto dto) {
+        Compilation compilation = new Compilation();
         compilation.setTitle(dto.getTitle());
-        compilation.setPinned(dto.isPinned());
-        compilation.setEvents(dto.getEvents());
-        return CompilationMapper.toDto(repository.save(compilation));
+        compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
+
+        if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
+            compilation.setEvents(dto.getEvents());
+        }
+
+        Compilation saved = compilationRepository.save(compilation);
+        return CompilationMapper.toDto(saved);
     }
 
     @Override
+    @Transactional
+    public CompilationDto update(Long id, UpdateCompilationRequest dto) {
+        Compilation compilation = compilationRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Compilation not found with id " + id));
+
+        if (dto.getTitle() != null) {
+            compilation.setTitle(dto.getTitle());
+        }
+
+        if (dto.getPinned() != null) {
+            compilation.setPinned(dto.getPinned());
+        }
+
+        if (dto.getEvents() != null) {
+            compilation.setEvents(dto.getEvents());
+        }
+
+        Compilation updated = compilationRepository.save(compilation);
+        return CompilationMapper.toDto(updated);
+    }
+
+    @Override
+    @Transactional
     public void delete(Long id) {
-        repository.deleteById(id);
-    }
-
-    @Override
-    public List<CompilationDto> getAll(int from, int size) {
-        List<Compilation> compilations = repository.findAll();
-        int start = Math.min(from, compilations.size());
-        int end = Math.min(start + size, compilations.size());
-        return compilations.subList(start, end).stream()
-                .map(CompilationMapper::toDto)
-                .collect(Collectors.toList());
+        if (!compilationRepository.existsById(id)) {
+            throw new NotFoundException("Compilation not found with id " + id);
+        }
+        compilationRepository.deleteById(id);
     }
 }

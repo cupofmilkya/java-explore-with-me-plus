@@ -1,16 +1,14 @@
 package ru.practicum.web.admin.service;
 
 import ru.practicum.web.admin.dto.CompilationDto;
-
-import java.util.List;
+import ru.practicum.web.admin.dto.NewCompilationDto;
+import ru.practicum.web.admin.dto.UpdateCompilationRequest;
 
 public interface AdminCompilationService {
 
-    CompilationDto create(CompilationDto dto);
+    CompilationDto create(NewCompilationDto dto);
 
-    CompilationDto update(Long id, CompilationDto dto);
+    CompilationDto update(Long id, UpdateCompilationRequest dto);
 
     void delete(Long id);
-
-    List<CompilationDto> getAll(int from, int size);
 }
