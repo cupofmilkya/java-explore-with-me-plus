@@ -8,33 +8,42 @@ import ru.practicum.web.user.entity.User;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "events")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "events")
 public class Event {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 120)
     private String title;
+    private String annotation;
+    private String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @Column(name = "event_date")
+    private LocalDateTime eventDate;
+
+    @ManyToOne
+    @JoinColumn(name = "initiator_id")
+    private User initiator;
+
+    @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @Column(length = 2000)
-    private String annotation;
+    private Boolean paid;
 
-    @Column(length = 7000)
-    private String description;
+    private Integer participantLimit;
 
-    @Column(name = "event_date", nullable = false)
-    private LocalDateTime eventDate;
+    @Column(name = "request_moderation")
+    private Boolean requestModeration;
+
+    @Enumerated(EnumType.STRING)
+    private Status status;
 
     @Column(name = "created_on")
     private LocalDateTime createdOn;
@@ -42,28 +51,13 @@ public class Event {
     @Column(name = "published_on")
     private LocalDateTime publishedOn;
 
-    @Column(name = "is_paid")
-    private Boolean paid = false;
-
-    @Column(name = "participant_limit")
-    private Integer participantLimit = 0;
-
-    @Column(name = "request_moderation")
-    private Boolean requestModeration = true;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "initiator_id")
-    private User initiator;
-
-    @Enumerated(EnumType.STRING)
-    private Status status = Status.PENDING;
+    @Transient
+    private Long views = 0L;
 
     @Column(name = "confirmed_requests")
-    private Integer confirmedRequests = 0;
+    private Long confirmedRequests = 0L;
 
     public enum Status {
-        PENDING,
-        PUBLISHED,
-        CANCELED
+        PENDING, PUBLISHED, CANCELED
     }
 }

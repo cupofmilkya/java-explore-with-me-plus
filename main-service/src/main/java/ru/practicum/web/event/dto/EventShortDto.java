@@ -11,20 +11,14 @@ import ru.practicum.web.admin.dto.UserShortDto;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EventDto {
+public class EventShortDto {
     private Long id;
     private String title;
     private String annotation;
-    private String description;
-    private String eventDate;
     private CategoryDto category;
-    private UserShortDto initiator;
     private Boolean paid;
-    private Integer participantLimit;
-    private Boolean requestModeration;
-    private String state;
-    private String createdOn;
-    private String publishedOn;
+    private String eventDate;
+    private UserShortDto initiator;
     private Long views;
     private Long confirmedRequests;
 }

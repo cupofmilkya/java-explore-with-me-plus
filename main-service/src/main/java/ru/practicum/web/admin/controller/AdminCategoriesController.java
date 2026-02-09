@@ -1,8 +1,6 @@
 package ru.practicum.web.admin.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import ru.practicum.web.admin.dto.CategoryDto;
 import ru.practicum.web.admin.dto.NewCategoryDto;
 import ru.practicum.web.admin.service.AdminCategoryService;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/admin/categories")
@@ -41,14 +37,5 @@ public class AdminCategoriesController {
     public ResponseEntity<Void> delete(@PathVariable Long catId) {
         service.delete(catId);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping
-    public ResponseEntity<List<CategoryDto>> getAll(
-            @Min(0) @RequestParam(defaultValue = "0") int from,
-            @Min(1) @Max(100) @RequestParam(defaultValue = "10") int size
-    ) {
-        List<CategoryDto> categories = service.getAll(from, size);
-        return ResponseEntity.ok(categories);
     }
 }

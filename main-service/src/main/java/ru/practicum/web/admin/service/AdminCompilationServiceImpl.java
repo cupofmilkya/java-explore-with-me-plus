@@ -10,6 +10,9 @@ import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.mapper.CompilationMapper;
 import ru.practicum.web.admin.repository.CompilationRepository;
 import ru.practicum.web.exception.NotFoundException;
+import ru.practicum.web.event.repository.EventRepository;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +20,7 @@ import ru.practicum.web.exception.NotFoundException;
 public class AdminCompilationServiceImpl implements AdminCompilationService {
 
     private final CompilationRepository compilationRepository;
+    private final EventRepository eventRepository;
 
     @Override
     @Transactional
@@ -26,7 +30,14 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
 
         if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
+            for (Long eventId : dto.getEvents()) {
+                if (!eventRepository.existsById(eventId)) {
+                    throw new NotFoundException("Event with id=" + eventId + " was not found");
+                }
+            }
             compilation.setEvents(dto.getEvents());
+        } else {
+            compilation.setEvents(List.of());
         }
 
         Compilation saved = compilationRepository.save(compilation);
@@ -37,7 +48,7 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
     @Transactional
     public CompilationDto update(Long id, UpdateCompilationRequest dto) {
         Compilation compilation = compilationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Compilation not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Compilation with id=" + id + " was not found"));
 
         if (dto.getTitle() != null) {
             compilation.setTitle(dto.getTitle());
@@ -48,6 +59,13 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         }
 
         if (dto.getEvents() != null) {
+            if (!dto.getEvents().isEmpty()) {
+                for (Long eventId : dto.getEvents()) {
+                    if (!eventRepository.existsById(eventId)) {
+                        throw new NotFoundException("Event with id=" + eventId + " was not found");
+                    }
+                }
+            }
             compilation.setEvents(dto.getEvents());
         }
 
@@ -59,7 +77,7 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
     @Transactional
     public void delete(Long id) {
         if (!compilationRepository.existsById(id)) {
-            throw new NotFoundException("Compilation not found with id " + id);
+            throw new NotFoundException("Compilation with id=" + id + " was not found");
         }
         compilationRepository.deleteById(id);
     }
