@@ -2,7 +2,7 @@ package ru.practicum.web.admin.service;
 
 import ru.practicum.web.admin.dto.CompilationDto;
 import ru.practicum.web.admin.dto.NewCompilationDto;
-import ru.practicum.web.admin.dto.UpdateCompilationRequest;
+import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 
 public interface AdminCompilationService {
 

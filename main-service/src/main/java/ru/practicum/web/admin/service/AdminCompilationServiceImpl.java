@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.admin.dto.CompilationDto;
 import ru.practicum.web.admin.dto.NewCompilationDto;
-import ru.practicum.web.admin.dto.UpdateCompilationRequest;
+import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.mapper.CompilationMapper;
 import ru.practicum.web.admin.repository.CompilationRepository;

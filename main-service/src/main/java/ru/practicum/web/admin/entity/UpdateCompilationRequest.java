@@ -1,4 +1,4 @@
-package ru.practicum.web.admin.dto;
+package ru.practicum.web.admin.entity;
 
 import lombok.Data;
 import jakarta.validation.constraints.Size;
