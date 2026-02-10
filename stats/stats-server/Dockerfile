@@ -6,8 +6,12 @@ COPY . .
 RUN mvn clean package -DskipTests -pl stats/stats-server -am
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk add --no-cache netcat-openbsd
 WORKDIR /app
 COPY --from=build /app/stats/stats-server/target/stats-server-*.jar app.jar
+COPY wait-for-it.sh /usr/local/bin/wait-for-it
+RUN chmod +x /usr/local/bin/wait-for-it
 
 EXPOSE 9090
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+ENTRYPOINT ["wait-for-it", "stats-db:5432", "--", "java", "-jar", "app.jar"]
