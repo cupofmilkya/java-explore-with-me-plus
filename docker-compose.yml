@@ -67,7 +67,7 @@ services:
       main-db:
         condition: service_healthy
       stats-server:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 10s
