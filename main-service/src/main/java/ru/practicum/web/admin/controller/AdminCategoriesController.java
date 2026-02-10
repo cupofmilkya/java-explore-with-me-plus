@@ -29,6 +29,10 @@ public class AdminCategoriesController {
             @PathVariable Long catId,
             @RequestBody @Valid CategoryDto dto
     ) {
+        if (dto.getName() != null && (dto.getName().isEmpty() || dto.getName().length() > 50)) {
+            return ResponseEntity.badRequest().build();
+        }
+
         CategoryDto updated = service.update(catId, dto);
         return ResponseEntity.ok(updated);
     }

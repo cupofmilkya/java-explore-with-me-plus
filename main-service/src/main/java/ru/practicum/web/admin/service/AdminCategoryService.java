@@ -14,4 +14,6 @@ public interface AdminCategoryService {
     void delete(Long id);
 
     List<CategoryDto> getAll(int from, int size);
+
+    CategoryDto getById(Long id);
 }

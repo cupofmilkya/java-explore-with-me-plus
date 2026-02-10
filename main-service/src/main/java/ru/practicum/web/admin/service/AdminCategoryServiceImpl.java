@@ -67,20 +67,18 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
 
     @Override
     public void delete(Long id) {
-        if (!repository.existsById(id)) {
-            throw new NotFoundException("Category with id=" + id + " was not found");
-        }
+        Category category = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
 
-         if (eventRepository.existsByCategoryId(id)) {
-             throw new ConflictException("The category is not empty");
-         }
+        if (eventRepository.existsByCategoryId(id)) {
+            throw new ConflictException("The category is not empty");
+        }
 
         repository.deleteById(id);
     }
 
     @Override
     public List<CategoryDto> getAll(int from, int size) {
-        // Правильная пагинация через Pageable
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
@@ -88,5 +86,11 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
                 .stream()
                 .map(CategoryMapper::toDto)
                 .collect(Collectors.toList());
+    }
+
+    public CategoryDto getById(Long id) {
+        return repository.findById(id)
+                .map(CategoryMapper::toDto)
+                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
     }
 }

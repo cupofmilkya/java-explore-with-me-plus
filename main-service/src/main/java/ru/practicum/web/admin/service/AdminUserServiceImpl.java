@@ -27,6 +27,16 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public UserDto create(NewUserRequest request) {
+        if (request.getEmail() == null || request.getEmail().isBlank() ||
+                request.getEmail().length() < 6 || request.getEmail().length() > 254) {
+            throw new IllegalArgumentException("Email length must be between 6 and 254 characters");
+        }
+
+        if (request.getName() == null || request.getName().isBlank() ||
+                request.getName().length() < 2 || request.getName().length() > 250) {
+            throw new IllegalArgumentException("Name length must be between 2 and 250 characters");
+        }
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new ConflictException("Email уже существует");
         }
@@ -54,6 +64,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     public List<UserDto> getUsers(@Nullable List<Long> ids, int from, int size) {
         if (size <= 0) {
             throw new IllegalArgumentException("Размер страницы должен быть больше 0");
+        }
+        if (from < 0) {
+            throw new IllegalArgumentException("Параметр from должен быть неотрицательным");
         }
 
         int page = from / size;

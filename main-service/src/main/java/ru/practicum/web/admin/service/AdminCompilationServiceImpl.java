@@ -25,6 +25,10 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
     @Override
     @Transactional
     public CompilationDto create(NewCompilationDto dto) {
+        if (dto.getTitle() == null || dto.getTitle().isBlank() || dto.getTitle().length() > 50) {
+            throw new IllegalArgumentException("Title length must be between 1 and 50 characters");
+        }
+
         Compilation compilation = new Compilation();
         compilation.setTitle(dto.getTitle());
         compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
@@ -51,6 +55,9 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
                 .orElseThrow(() -> new NotFoundException("Compilation with id=" + id + " was not found"));
 
         if (dto.getTitle() != null) {
+            if (dto.getTitle().isBlank() || dto.getTitle().length() > 50) {
+                throw new IllegalArgumentException("Title length must be between 1 and 50 characters");
+            }
             compilation.setTitle(dto.getTitle());
         }
 
