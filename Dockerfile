@@ -10,4 +10,5 @@ WORKDIR /app
 COPY --from=build /app/main-service/target/main-service-*.jar app.jar
 
 EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
