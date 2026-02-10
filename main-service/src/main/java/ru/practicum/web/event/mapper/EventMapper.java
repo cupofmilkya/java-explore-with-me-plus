@@ -3,6 +3,7 @@ package ru.practicum.web.event.mapper;
 import ru.practicum.web.admin.dto.CategoryDto;
 import ru.practicum.web.admin.dto.UserShortDto;
 import ru.practicum.web.event.dto.EventDto;
+import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
 
 import java.time.LocalDateTime;
@@ -23,7 +24,6 @@ public class EventMapper {
         dto.setAnnotation(event.getAnnotation());
         dto.setDescription(event.getDescription());
 
-        // Конвертируем LocalDateTime в String
         if (event.getEventDate() != null) {
             dto.setEventDate(event.getEventDate().format(FORMATTER));
         }
@@ -44,7 +44,6 @@ public class EventMapper {
             dto.setPublishedOn(event.getPublishedOn().format(FORMATTER));
         }
 
-        // Инициализация вложенных объектов если они есть
         if (event.getCategory() != null) {
             CategoryDto categoryDto = new CategoryDto();
             categoryDto.setId(event.getCategory().getId());
@@ -59,7 +58,6 @@ public class EventMapper {
             dto.setInitiator(userDto);
         }
 
-        // Пробуем получить views через рефлексию, но лучше добавить поле в Event
         try {
             var viewsField = event.getClass().getDeclaredField("views");
             viewsField.setAccessible(true);
@@ -91,12 +89,10 @@ public class EventMapper {
         event.setAnnotation(dto.getAnnotation());
         event.setDescription(dto.getDescription());
 
-        // Конвертируем String в LocalDateTime
         if (dto.getEventDate() != null && !dto.getEventDate().isEmpty()) {
             try {
                 event.setEventDate(LocalDateTime.parse(dto.getEventDate(), FORMATTER));
             } catch (Exception e) {
-                // Пробуем стандартный парсинг
                 try {
                     event.setEventDate(LocalDateTime.parse(dto.getEventDate()));
                 } catch (Exception e2) {
@@ -119,7 +115,6 @@ public class EventMapper {
         event.setParticipantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0);
         event.setRequestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true);
 
-        // Поля createdOn и publishedOn обычно устанавливаются автоматически
         if (dto.getCreatedOn() != null && !dto.getCreatedOn().isEmpty()) {
             try {
                 event.setCreatedOn(LocalDateTime.parse(dto.getCreatedOn(), FORMATTER));
@@ -175,5 +170,56 @@ public class EventMapper {
         if (dto.getRequestModeration() != null) {
             event.setRequestModeration(dto.getRequestModeration());
         }
+    }
+
+    public static EventShortDto toShortDto(Event event) {
+        if (event == null) {
+            return null;
+        }
+
+        EventShortDto dto = new EventShortDto();
+        dto.setId(event.getId());
+        dto.setTitle(event.getTitle());
+        dto.setAnnotation(event.getAnnotation());
+
+        if (event.getEventDate() != null) {
+            dto.setEventDate(event.getEventDate().format(FORMATTER));
+        }
+
+        dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
+
+        if (event.getCategory() != null) {
+            CategoryDto categoryDto = new CategoryDto();
+            categoryDto.setId(event.getCategory().getId());
+            categoryDto.setName(event.getCategory().getName());
+            dto.setCategory(categoryDto);
+        }
+
+        if (event.getInitiator() != null) {
+            UserShortDto userDto = new UserShortDto();
+            userDto.setId(event.getInitiator().getId());
+            userDto.setName(event.getInitiator().getName());
+            dto.setInitiator(userDto);
+        }
+
+        try {
+            var viewsField = event.getClass().getDeclaredField("views");
+            viewsField.setAccessible(true);
+            Object viewsValue = viewsField.get(event);
+            if (viewsValue instanceof Integer) {
+                dto.setViews(((Integer) viewsValue).longValue());
+            } else if (viewsValue instanceof Long) {
+                dto.setViews((Long) viewsValue);
+            } else {
+                dto.setViews(0L);
+            }
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            dto.setViews(0L);
+        }
+
+        dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
+                event.getConfirmedRequests() : 0L);
+
+        return dto;
     }
 }
