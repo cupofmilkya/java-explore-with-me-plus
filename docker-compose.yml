@@ -49,12 +49,6 @@ services:
     depends_on:
       stats-db:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/actuator/health || exit 0"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
 
   ewm-service:
     build:
@@ -74,7 +68,7 @@ services:
       main-db:
         condition: service_healthy
       stats-server:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   main-db-data:
