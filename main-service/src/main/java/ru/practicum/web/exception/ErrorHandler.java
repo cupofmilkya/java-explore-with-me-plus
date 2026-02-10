@@ -137,23 +137,4 @@ public class ErrorHandler {
                 .errors(Collections.emptyList())
                 .build();
     }
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError handleValidationExceptions(MethodArgumentNotValidException ex) {
-        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                .map(fieldError -> String.format("Field: %s. Error: %s. Value: %s",
-                        fieldError.getField(),
-                        fieldError.getDefaultMessage(),
-                        fieldError.getRejectedValue()))
-                .collect(Collectors.joining("; "));
-
-        return ApiError.builder()
-                .status(HttpStatus.BAD_REQUEST.name())
-                .reason("Incorrectly made request.")
-                .message(errorMessage)
-                .timestamp(LocalDateTime.now().format(FORMATTER))
-                .errors(Collections.emptyList())
-                .build();
-    }
 }
