@@ -64,7 +64,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
         if (size <= 0) {
-            throw new BadRequestException("Parameter 'size' must be positive");
+            size = 10;
         }
 
         int page = from / size;
@@ -91,7 +91,8 @@ public class PublicEventServiceImpl implements PublicEventService {
         );
 
         List<Event> events = eventPage.getContent();
-        log.info("Found {} events", events.size());
+        log.info("Found {} events, total pages: {}, total elements: {}",
+                events.size(), eventPage.getTotalPages(), eventPage.getTotalElements());
 
         if (events.isEmpty()) {
             return List.of();
@@ -144,7 +145,11 @@ public class PublicEventServiceImpl implements PublicEventService {
                     ));
         } catch (Exception e) {
             log.error("Error getting views stats: {}", e.getMessage());
-            return Map.of();
+            return events.stream()
+                    .collect(Collectors.toMap(
+                            Event::getId,
+                            ee -> 0L
+                    ));
         }
     }
 

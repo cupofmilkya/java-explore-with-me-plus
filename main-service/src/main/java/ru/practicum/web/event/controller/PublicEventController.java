@@ -10,7 +10,6 @@ import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.service.PublicEventService;
-import ru.practicum.web.exception.BadRequestException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,28 +36,8 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
-        if (from < 0) {
-            throw new BadRequestException("Parameter 'from' must be non-negative");
-        }
-        if (size <= 0) {
-            throw new BadRequestException("Parameter 'size' must be positive");
-        }
-        if (text != null && text.isBlank()) {
-            throw new BadRequestException("Text must not be blank");
-        }
-        if (rangeStart != null && rangeEnd != null) {
-            try {
-                LocalDateTime start = LocalDateTime.parse(rangeStart.replace(" ", "T"));
-                LocalDateTime end = LocalDateTime.parse(rangeEnd.replace(" ", "T"));
-                if (start.isAfter(end)) {
-                    throw new BadRequestException("rangeStart must be before rangeEnd");
-                }
-            } catch (Exception e) {
-                throw new BadRequestException("Invalid date format");
-            }
-        }
+        log.info("GET /events with from={}, size={}", from, size);
 
-        hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size
@@ -70,23 +49,25 @@ public class PublicEventController {
     public ResponseEntity<EventDto> getEvent(@PathVariable Long id,
                                              HttpServletRequest request) {
         log.info("GET /events/{}", id);
-        hitStats(request);
+
+        try {
+            hitStats(request);
+        } catch (Exception e) {
+            log.error("Failed to send stats, but continuing: {}", e.getMessage());
+        }
+
         EventDto event = publicEventService.getEvent(id);
         return ResponseEntity.ok(event);
     }
 
     private void hitStats(HttpServletRequest request) {
-        try {
-            statsClient.hit(
-                    EndpointHitDto.builder()
-                            .app("ewm-main-service")
-                            .uri(request.getRequestURI())
-                            .ip(request.getRemoteAddr())
-                            .timestamp(LocalDateTime.now())
-                            .build()
-            );
-        } catch (Exception e) {
-            log.error("Error sending stats: {}", e.getMessage());
-        }
+        statsClient.hit(
+                EndpointHitDto.builder()
+                        .app("ewm-main-service")
+                        .uri(request.getRequestURI())
+                        .ip(request.getRemoteAddr())
+                        .timestamp(LocalDateTime.now())
+                        .build()
+        );
     }
 }
