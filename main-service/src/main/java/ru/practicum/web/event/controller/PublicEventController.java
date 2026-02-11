@@ -43,6 +43,21 @@ public class PublicEventController {
         if (size <= 0) {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
+        if (text != null && text.isBlank()) {
+            throw new BadRequestException("Text must not be blank");
+        }
+        if (rangeStart != null && rangeEnd != null) {
+            try {
+                LocalDateTime start = LocalDateTime.parse(rangeStart.replace(" ", "T"));
+                LocalDateTime end = LocalDateTime.parse(rangeEnd.replace(" ", "T"));
+                if (start.isAfter(end)) {
+                    throw new BadRequestException("rangeStart must be before rangeEnd");
+                }
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid date format");
+            }
+        }
+
         hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,

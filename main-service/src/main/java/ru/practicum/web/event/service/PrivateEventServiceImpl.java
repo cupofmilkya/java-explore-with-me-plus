@@ -15,6 +15,7 @@ import ru.practicum.web.event.dto.UpdateEventUserRequest;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.user.repository.UserRepository;
@@ -144,7 +145,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
         if (updateRequest.getParticipantLimit() != null) {
             if (updateRequest.getParticipantLimit() < 0) {
-                throw new ConflictException("Participant limit must be non-negative");
+                throw new BadRequestException("Participant limit must be non-negative");
             }
             event.setParticipantLimit(updateRequest.getParticipantLimit());
         }

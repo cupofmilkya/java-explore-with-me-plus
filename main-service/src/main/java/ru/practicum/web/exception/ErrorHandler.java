@@ -173,4 +173,17 @@ public class ErrorHandler {
                 .errors(Collections.emptyList())
                 .build();
     }
+
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleConstraintViolationException(jakarta.validation.ConstraintViolationException e) {
+        log.error("400 Bad Request - Constraint violation: {}", e.getMessage());
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST.name())
+                .reason("Incorrectly made request.")
+                .message(e.getMessage())
+                .timestamp(LocalDateTime.now().format(FORMATTER))
+                .errors(Collections.emptyList())
+                .build();
+    }
 }

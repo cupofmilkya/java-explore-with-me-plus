@@ -11,6 +11,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.dto.NewEventDto;
 import ru.practicum.web.event.dto.UpdateEventUserRequest;
 import ru.practicum.web.event.service.PrivateEventService;
+import ru.practicum.web.exception.BadRequestException;
 
 import java.util.List;
 
@@ -28,6 +29,12 @@ public class PrivateEventController {
             @RequestParam(defaultValue = "0") int from,
             @RequestParam(defaultValue = "10") int size
     ) {
+        if (from < 0) {
+            throw new BadRequestException("Parameter 'from' must be non-negative");
+        }
+        if (size <= 0) {
+            throw new BadRequestException("Parameter 'size' must be positive");
+        }
         List<EventShortDto> events = privateEventService.getEvents(userId, from, size);
         return ResponseEntity.ok(events);
     }
