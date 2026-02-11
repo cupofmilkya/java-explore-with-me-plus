@@ -6,16 +6,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import ru.practicum.statsclient.StatsClient;
-import ru.practicum.dto.ViewStatsDto; // Импортируем ваш DTO
+import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.web.admin.entity.UpdateEventAdminRequest;
+import ru.practicum.web.admin.repository.CategoryRepository;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.entity.Event;
-import ru.practicum.web.admin.repository.CategoryRepository;
+import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 
 import jakarta.transaction.Transactional;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -31,24 +33,25 @@ public class AdminEventServiceImpl implements AdminEventService {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
-    public List<EventDto> getEvents(
-            List<Long> users,
-            List<String> states,
-            List<Long> categories,
-            String rangeStart,
-            String rangeEnd,
-            int from,
-            int size
-    ) {
-        Pageable pageable = PageRequest.of(from / size, size);
+    public List<EventDto> getEvents(List<Long> users,
+                                    List<String> states,
+                                    List<Long> categories,
+                                    String rangeStart,
+                                    String rangeEnd,
+                                    int from,
+                                    int size) {
 
+        Pageable pageable = PageRequest.of(from / size, size);
         LocalDateTime start = parseDateTime(rangeStart);
         LocalDateTime end = parseDateTime(rangeEnd);
 
+        List<Event.Status> statusEnums = (states == null || states.isEmpty()) ? null :
+                states.stream().map(Event.Status::valueOf).toList();
+
         Page<Event> eventPage = eventRepository.findEventsByAdminFilters(
-                users,
-                states,
-                categories,
+                (users == null || users.isEmpty()) ? null : users,
+                statusEnums,
+                (categories == null || categories.isEmpty()) ? null : categories,
                 start,
                 end,
                 pageable
@@ -56,8 +59,10 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         List<Event> events = eventPage.getContent();
 
+        events.forEach(event -> event.setViews(getViews(event)));
+
         return events.stream()
-                .map(this::toDto)
+                .map(EventMapper::toDto)
                 .toList();
     }
 
@@ -66,73 +71,48 @@ public class AdminEventServiceImpl implements AdminEventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        if (updateRequest.getTitle() != null) {
-            event.setTitle(updateRequest.getTitle());
-        }
+        Event tempEvent = new Event();
+        if (updateRequest.getTitle() != null) tempEvent.setTitle(updateRequest.getTitle());
+        if (updateRequest.getAnnotation() != null) tempEvent.setAnnotation(updateRequest.getAnnotation());
+        if (updateRequest.getDescription() != null) tempEvent.setDescription(updateRequest.getDescription());
+        if (updateRequest.getEventDate() != null) tempEvent.setEventDate(parseDateTime(updateRequest.getEventDate()));
+        if (updateRequest.getPaid() != null) tempEvent.setPaid(updateRequest.getPaid());
+        if (updateRequest.getParticipantLimit() != null) tempEvent.setParticipantLimit(updateRequest.getParticipantLimit());
+        if (updateRequest.getRequestModeration() != null) tempEvent.setRequestModeration(updateRequest.getRequestModeration());
 
-        if (updateRequest.getAnnotation() != null) {
-            event.setAnnotation(updateRequest.getAnnotation());
-        }
-
-        if (updateRequest.getDescription() != null) {
-            event.setDescription(updateRequest.getDescription());
-        }
-
-        if (updateRequest.getEventDate() != null) {
-            LocalDateTime newEventDate = parseDateTime(updateRequest.getEventDate());
-            event.setEventDate(newEventDate);
-        }
-
-        if (updateRequest.getPaid() != null) {
-            event.setPaid(updateRequest.getPaid());
-        }
-
-        if (updateRequest.getParticipantLimit() != null) {
-            event.setParticipantLimit(updateRequest.getParticipantLimit());
-        }
-
-        if (updateRequest.getRequestModeration() != null) {
-            event.setRequestModeration(updateRequest.getRequestModeration());
-        }
+        EventMapper.updateEntityFromDto(event, EventMapper.toDto(tempEvent));
 
         if (updateRequest.getCategory() != null) {
-            categoryRepository.findById(updateRequest.getCategory())
-                    .ifPresent(event::setCategory);
+            event.setCategory(categoryRepository.findById(updateRequest.getCategory())
+                    .orElseThrow(() -> new NotFoundException("Category with id=" + updateRequest.getCategory() + " not found")));
         }
 
         if (updateRequest.getStateAction() != null) {
             switch (updateRequest.getStateAction().toUpperCase()) {
-                case "PUBLISH_EVENT":
-                    if (event.getStatus() != Event.Status.PENDING) {
+                case "PUBLISH_EVENT" -> {
+                    if (event.getStatus() != Event.Status.PENDING)
                         throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getStatus());
-                    }
-                    if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(1))) {
+                    if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(1)))
                         throw new ConflictException("Cannot publish event because event date is too soon");
-                    }
                     event.setStatus(Event.Status.PUBLISHED);
                     event.setPublishedOn(LocalDateTime.now());
-                    break;
-
-                case "REJECT_EVENT":
-                    if (event.getStatus() == Event.Status.PUBLISHED) {
+                }
+                case "REJECT_EVENT" -> {
+                    if (event.getStatus() == Event.Status.PUBLISHED)
                         throw new ConflictException("Cannot reject already published event");
-                    }
                     event.setStatus(Event.Status.CANCELED);
-                    break;
-
-                default:
-                    throw new IllegalArgumentException("Invalid state action: " + updateRequest.getStateAction());
+                }
+                default ->
+                        throw new IllegalArgumentException("Invalid state action: " + updateRequest.getStateAction());
             }
         }
 
-        Event updated = eventRepository.save(event);
-        return toDto(updated);
+        event.setViews(getViews(event));
+        return EventMapper.toDto(eventRepository.save(event));
     }
 
     private LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
-            return null;
-        }
+        if (dateTimeStr == null || dateTimeStr.isBlank()) return null;
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (Exception e) {
@@ -144,53 +124,27 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
     }
 
-    private EventDto toDto(Event event) {
-        EventDto result = EventDto.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .annotation(event.getAnnotation())
-                .description(event.getDescription())
-                .eventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null)
-                .paid(event.getPaid() != null ? event.getPaid() : false)
-                .participantLimit(event.getParticipantLimit() != null ? event.getParticipantLimit() : 0)
-                .requestModeration(event.getRequestModeration() != null ? event.getRequestModeration() : true)
-                .state(event.getStatus() != null ? event.getStatus().name() : null)
-                .views(getViews(event))
-                .confirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L)
-                .build();
-
-        if (event.getCreatedOn() != null) {
-            result.setCreatedOn(event.getCreatedOn().format(FORMATTER));
-        }
-
-        if (event.getPublishedOn() != null) {
-            result.setPublishedOn(event.getPublishedOn().format(FORMATTER));
-        }
-
-        return result;
-    }
-
     private Long getViews(Event event) {
-        if (statsClient == null || event.getId() == null) {
-            return 0L;
-        }
-
+        if (statsClient == null || event.getId() == null) return 0L;
         try {
-            LocalDateTime start = event.getCreatedOn() != null ?
-                    event.getCreatedOn() : LocalDateTime.now().minusYears(1);
-
+            LocalDateTime start = event.getCreatedOn() != null ? event.getCreatedOn() : LocalDateTime.now().minusYears(1);
             String uri = "/events/" + event.getId();
-
-            List<ViewStatsDto> stats = statsClient.getStats(
-                    start,
-                    LocalDateTime.now(),
-                    List.of(uri),
-                    true
-            );
-
+            List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), List.of(uri), true);
             return stats.isEmpty() ? 0L : stats.getFirst().getHits();
         } catch (Exception e) {
             return 0L;
         }
+    }
+
+    private EventDto updateRequestToEventDto(UpdateEventAdminRequest req) {
+        EventDto dto = new EventDto();
+        dto.setTitle(req.getTitle());
+        dto.setAnnotation(req.getAnnotation());
+        dto.setDescription(req.getDescription());
+        dto.setEventDate(req.getEventDate());
+        dto.setPaid(req.getPaid());
+        dto.setParticipantLimit(req.getParticipantLimit());
+        dto.setRequestModeration(req.getRequestModeration());
+        return dto;
     }
 }

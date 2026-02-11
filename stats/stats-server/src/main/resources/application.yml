@@ -1,5 +1,6 @@
 server:
   port: 9090
+  address: 0.0.0.0
 
 spring:
   datasource:
@@ -21,3 +22,11 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+management:
+  server:
+    port: 9090
+  endpoints:
+    web:
+      exposure:
+        include: health

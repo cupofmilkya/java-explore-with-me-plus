@@ -23,17 +23,18 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Query("SELECT e FROM Event e WHERE " +
             "(:users IS NULL OR e.initiator.id IN :users) AND " +
-            "(:states IS NULL OR e.status IN :states) AND " +
+            "(:statuses IS NULL OR e.status IN :statuses) AND " +
             "(:categories IS NULL OR e.category.id IN :categories) AND " +
-            "(:rangeStart IS NULL OR e.eventDate >= :rangeStart) AND " +
-            "(:rangeEnd IS NULL OR e.eventDate <= :rangeEnd)")
+            "(cast(:start AS timestamp) IS NULL OR e.eventDate >= :start) AND " +
+            "(cast(:end AS timestamp) IS NULL OR e.eventDate <= :end)")
     Page<Event> findEventsByAdminFilters(
             @Param("users") List<Long> users,
-            @Param("states") List<String> states,
+            @Param("statuses") List<Event.Status> statuses,
             @Param("categories") List<Long> categories,
-            @Param("rangeStart") LocalDateTime rangeStart,
-            @Param("rangeEnd") LocalDateTime rangeEnd,
-            Pageable pageable);
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            Pageable pageable
+    );
 
     @Query("SELECT e FROM Event e WHERE " +
             "e.status = 'PUBLISHED' AND " +

@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
-import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
@@ -77,7 +76,7 @@ public class ErrorHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError validationHandler(MethodArgumentNotValidException e) {
+    public ApiError handleValidationExceptions(MethodArgumentNotValidException e) {  // Измените имя метода
         log.error("MethodArgumentNotValidException: {}", e.getMessage());
         String message = "Validation error";
         if (e.getBindingResult().getFieldError() != null) {

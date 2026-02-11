@@ -20,9 +20,10 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 stats:
-  service:
-    url: http://stats-server:9090
-    enabled: true
+  client:
+    base-url: http://stats-server:9090
+    connect-timeout-millis: 5000
+    read-timeout-millis: 5000
 
 app:
   default-page-size: 10
