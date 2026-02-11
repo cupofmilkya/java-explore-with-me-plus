@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -120,7 +121,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         LocalDateTime start = events.stream()
                 .map(Event::getCreatedOn)
-                .filter(date -> date != null)
+                .filter(Objects::nonNull)
                 .min(LocalDateTime::compareTo)
                 .orElse(LocalDateTime.now().minusYears(1));
 
@@ -163,7 +164,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.get(0).getHits();
+            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
         } catch (Exception e) {
             log.error("Error getting views for event {}: {}", event.getId(), e.getMessage());
             return 0L;
