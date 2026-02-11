@@ -36,8 +36,6 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
-        log.info("GET /events with from={}, size={}", from, size);
-
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size

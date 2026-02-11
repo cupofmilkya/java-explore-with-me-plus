@@ -19,6 +19,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,11 +61,12 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
+        // Валидация входных параметров
         if (from < 0) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
         if (size <= 0) {
-            size = 10;
+            throw new BadRequestException("Parameter 'size' must be positive");
         }
 
         int page = from / size;
@@ -75,12 +77,24 @@ public class PublicEventServiceImpl implements PublicEventService {
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
-        if (rangeStart != null && !rangeStart.isBlank()) {
-            startDateTime = parseDateTime(rangeStart);
+        try {
+            if (rangeStart != null && !rangeStart.isBlank()) {
+                startDateTime = parseDateTime(rangeStart);
+            }
+            if (rangeEnd != null && !rangeEnd.isBlank()) {
+                endDateTime = parseDateTime(rangeEnd);
+            }
+        } catch (DateTimeParseException e) {
+            throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
         }
-        if (rangeEnd != null && !rangeEnd.isBlank()) {
-            endDateTime = parseDateTime(rangeEnd);
+
+        if (startDateTime == null && rangeStart != null && !rangeStart.isBlank()) {
+            throw new BadRequestException("Invalid date format for rangeStart");
         }
+        if (endDateTime == null && rangeEnd != null && !rangeEnd.isBlank()) {
+            throw new BadRequestException("Invalid date format for rangeEnd");
+        }
+
         if (startDateTime == null) {
             startDateTime = LocalDateTime.now();
         }
@@ -100,7 +114,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Map<Long, Long> viewsMap = getViewsMap(events);
 
-        return events.stream()
+        List<EventShortDto> result = events.stream()
                 .map(event -> {
                     Long views = viewsMap.getOrDefault(event.getId(), 0L);
                     event.setViews(views);
@@ -111,6 +125,21 @@ public class PublicEventServiceImpl implements PublicEventService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        // Сортировка если указана
+        if ("EVENT_DATE".equals(sort)) {
+            result.sort((e1, e2) -> {
+                if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
+                return e1.getEventDate().compareTo(e2.getEventDate());
+            });
+        } else if ("VIEWS".equals(sort)) {
+            result.sort((e1, e2) -> {
+                if (e1.getViews() == null || e2.getViews() == null) return 0;
+                return e1.getViews().compareTo(e2.getViews());
+            });
+        }
+
+        return result;
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
@@ -193,11 +222,15 @@ public class PublicEventServiceImpl implements PublicEventService {
         }
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             try {
-                return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
-            } catch (Exception e2) {
-                throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
+                return LocalDateTime.parse(dateTimeStr);
+            } catch (DateTimeParseException e2) {
+                try {
+                    return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
+                } catch (DateTimeParseException e3) {
+                    throw new DateTimeParseException("Invalid date format", dateTimeStr, 0);
+                }
             }
         }
     }
