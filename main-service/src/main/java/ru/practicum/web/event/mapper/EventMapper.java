@@ -4,6 +4,7 @@ import ru.practicum.web.admin.dto.CategoryDto;
 import ru.practicum.web.admin.dto.UserShortDto;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
+import ru.practicum.web.event.dto.NewEventDto;
 import ru.practicum.web.event.entity.Event;
 
 import java.time.LocalDateTime;
@@ -183,5 +184,24 @@ public class EventMapper {
         }
 
         return dto;
+    }
+
+    public static Event fromNewDto(NewEventDto dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        Event event = new Event();
+        event.setTitle(dto.getTitle());
+        event.setAnnotation(dto.getAnnotation());
+        event.setDescription(dto.getDescription());
+        event.setPaid(dto.getPaid() != null ? dto.getPaid() : false);
+        event.setParticipantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0);
+        event.setRequestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true);
+        event.setLocation(dto.getLocation());
+        event.setViews(0L);
+        event.setConfirmedRequests(0L);
+
+        return event;
     }
 }

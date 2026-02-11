@@ -78,8 +78,9 @@ public class PublicEventServiceImpl implements PublicEventService {
         if (rangeEnd != null && !rangeEnd.isBlank()) {
             endDateTime = parseDateTime(rangeEnd);
         }
-        if (startDateTime == null) {
-            startDateTime = LocalDateTime.now();
+        if (startDateTime != null && endDateTime != null
+                && endDateTime.isBefore(startDateTime)) {
+            throw new BadRequestException("rangeEnd must not be before rangeStart");
         }
 
         Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
