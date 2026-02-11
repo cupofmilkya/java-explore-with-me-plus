@@ -1,6 +1,7 @@
 package ru.practicum.web.event.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -65,8 +67,8 @@ public class PublicEventServiceImpl implements PublicEventService {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
 
-        Pageable pageable;
         int page = from / size;
+        Pageable pageable;
 
         if (sort != null && sort.equalsIgnoreCase("EVENT_DATE")) {
             pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
@@ -74,8 +76,19 @@ public class PublicEventServiceImpl implements PublicEventService {
             pageable = PageRequest.of(page, size);
         }
 
-        LocalDateTime startDateTime = parseDateTime(rangeStart);
-        LocalDateTime endDateTime = parseDateTime(rangeEnd);
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+
+        try {
+            if (rangeStart != null && !rangeStart.isBlank()) {
+                startDateTime = parseDateTime(rangeStart);
+            }
+            if (rangeEnd != null && !rangeEnd.isBlank()) {
+                endDateTime = parseDateTime(rangeEnd);
+            }
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid date format");
+        }
 
         if (startDateTime == null) {
             startDateTime = LocalDateTime.now();
@@ -145,6 +158,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                             (existing, replacement) -> existing
                     ));
         } catch (Exception e) {
+            log.error("Error getting views stats: {}", e.getMessage());
             return Map.of();
         }
     }
@@ -167,8 +181,9 @@ public class PublicEventServiceImpl implements PublicEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+            return stats.isEmpty() ? 0L : stats.get(0).getHits();
         } catch (Exception e) {
+            log.error("Error getting views for event {}: {}", event.getId(), e.getMessage());
             return 0L;
         }
     }
@@ -190,9 +205,9 @@ public class PublicEventServiceImpl implements PublicEventService {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (Exception e) {
             try {
-                return LocalDateTime.parse(dateTimeStr);
+                return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
             } catch (Exception e2) {
-                throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss or ISO format");
+                throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
             }
         }
     }

@@ -130,6 +130,10 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             throw new ConflictException("Participant limit is 0, no moderation needed");
         }
 
+        if (!event.getRequestModeration()) {
+            throw new ConflictException("Request moderation is disabled for this event");
+        }
+
         List<ParticipationRequest> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
 
         if (requests.isEmpty()) {
@@ -139,9 +143,6 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         for (ParticipationRequest request : requests) {
             if (!request.getEvent().getId().equals(eventId)) {
                 throw new NotFoundException("Request with id=" + request.getId() + " not found for this event");
-            }
-            if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
-                throw new ConflictException("Request must have status PENDING");
             }
         }
 
@@ -153,6 +154,12 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         List<ParticipationRequestDto> rejectedRequestsList = new ArrayList<>();
 
         if ("CONFIRMED".equals(statusUpdateRequest.getStatus())) {
+            for (ParticipationRequest request : requests) {
+                if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
+                    throw new ConflictException("Request must have status PENDING");
+                }
+            }
+
             int confirmedCount = 0;
             for (ParticipationRequest request : requests) {
                 if (confirmedCount < availableSlots) {
@@ -170,6 +177,12 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             eventRepository.save(event);
 
         } else if ("REJECTED".equals(statusUpdateRequest.getStatus())) {
+            for (ParticipationRequest request : requests) {
+                if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
+                    throw new ConflictException("Request must have status PENDING");
+                }
+            }
+
             for (ParticipationRequest request : requests) {
                 request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
                 requestRepository.save(request);

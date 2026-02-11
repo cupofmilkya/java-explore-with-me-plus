@@ -2,6 +2,7 @@ package ru.practicum.web.event.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.EndpointHitDto;
@@ -14,6 +15,7 @@ import ru.practicum.web.exception.BadRequestException;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/events")
 @RequiredArgsConstructor
@@ -41,6 +43,19 @@ public class PublicEventController {
         if (size <= 0) {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
+
+        if (rangeStart != null && rangeEnd != null) {
+            try {
+                LocalDateTime start = LocalDateTime.parse(rangeStart.replace(" ", "T"));
+                LocalDateTime end = LocalDateTime.parse(rangeEnd.replace(" ", "T"));
+                if (start.isAfter(end)) {
+                    throw new BadRequestException("rangeStart must be before rangeEnd");
+                }
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid date format");
+            }
+        }
+
         hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
@@ -68,7 +83,7 @@ public class PublicEventController {
                             .build()
             );
         } catch (Exception e) {
-            System.err.println("Error sending stats: " + e.getMessage());
+            log.error("Error sending stats: {}", e.getMessage());
         }
     }
 }
