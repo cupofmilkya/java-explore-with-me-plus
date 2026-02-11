@@ -72,7 +72,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         LocalDateTime eventDate = parseDateTime(dto.getEventDate());
         if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + dto.getEventDate());
+            throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + dto.getEventDate());
         }
 
         Event event = Event.builder()
@@ -136,7 +136,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         if (updateRequest.getEventDate() != null) {
             LocalDateTime newEventDate = parseDateTime(updateRequest.getEventDate());
             if (newEventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
+                throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
             }
             event.setEventDate(newEventDate);
         }

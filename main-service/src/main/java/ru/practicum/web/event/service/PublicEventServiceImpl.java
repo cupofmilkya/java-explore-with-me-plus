@@ -70,6 +70,8 @@ public class PublicEventServiceImpl implements PublicEventService {
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
+        log.info("Getting events with from={}, size={}, page={}", from, size, page);
+
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
@@ -89,9 +91,15 @@ public class PublicEventServiceImpl implements PublicEventService {
         );
 
         List<Event> events = eventPage.getContent();
+        log.info("Found {} events", events.size());
+
+        if (events.isEmpty()) {
+            return List.of();
+        }
+
         Map<Long, Long> viewsMap = getViewsMap(events);
 
-        List<EventShortDto> dtos = events.stream()
+        return events.stream()
                 .map(event -> {
                     Long views = viewsMap.getOrDefault(event.getId(), 0L);
                     event.setViews(views);
@@ -102,11 +110,6 @@ public class PublicEventServiceImpl implements PublicEventService {
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-        if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
-            dtos.sort((e1, e2) -> Long.compare(e2.getViews(), e1.getViews()));
-        }
-        return dtos;
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
