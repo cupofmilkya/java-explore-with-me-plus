@@ -15,6 +15,7 @@ import ru.practicum.web.event.dto.UpdateEventUserRequest;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.user.repository.UserRepository;
@@ -71,7 +72,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         LocalDateTime eventDate = parseDateTime(dto.getEventDate());
         if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + dto.getEventDate());
+            throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + dto.getEventDate());
         }
 
         Event event = Event.builder()
@@ -135,7 +136,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         if (updateRequest.getEventDate() != null) {
             LocalDateTime newEventDate = parseDateTime(updateRequest.getEventDate());
             if (newEventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
+                throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
             }
             event.setEventDate(newEventDate);
         }
@@ -246,7 +247,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.get(0).getHits();
+            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
         } catch (Exception e) {
             return 0L;
         }

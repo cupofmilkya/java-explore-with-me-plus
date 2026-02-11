@@ -9,6 +9,7 @@ import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.service.PublicEventService;
+import ru.practicum.web.exception.BadRequestException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +35,12 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
+        if (from < 0) {
+            throw new BadRequestException("Parameter 'from' must be non-negative");
+        }
+        if (size <= 0) {
+            throw new BadRequestException("Parameter 'size' must be positive");
+        }
         hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
@@ -51,13 +58,17 @@ public class PublicEventController {
     }
 
     private void hitStats(HttpServletRequest request) {
-        statsClient.hit(
-                EndpointHitDto.builder()
-                        .app("ewm-main-service")
-                        .uri(request.getRequestURI())
-                        .ip(request.getRemoteAddr())
-                        .timestamp(LocalDateTime.now())
-                        .build()
-        );
+        try {
+            statsClient.hit(
+                    EndpointHitDto.builder()
+                            .app("ewm-main-service")
+                            .uri(request.getRequestURI())
+                            .ip(request.getRemoteAddr())
+                            .timestamp(LocalDateTime.now())
+                            .build()
+            );
+        } catch (Exception e) {
+            System.err.println("Error sending stats: " + e.getMessage());
+        }
     }
 }

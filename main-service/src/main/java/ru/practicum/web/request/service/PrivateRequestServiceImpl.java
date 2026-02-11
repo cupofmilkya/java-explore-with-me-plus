@@ -122,11 +122,19 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        if (event.getParticipantLimit() == 0 || !event.getRequestModeration()) {
+        if (event.getParticipantLimit() == 0) {
+            throw new ConflictException("Request moderation is disabled for this event");
+        }
+
+        if (!event.getRequestModeration()) {
             throw new ConflictException("Request moderation is disabled for this event");
         }
 
         List<Request> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
+
+        if (requests.isEmpty()) {
+            throw new BadRequestException("Request ids list is empty");
+        }
 
         for (Request request : requests) {
             if (!request.getEvent().getId().equals(eventId)) {

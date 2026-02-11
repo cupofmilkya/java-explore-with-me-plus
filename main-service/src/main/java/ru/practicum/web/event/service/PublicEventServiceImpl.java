@@ -13,6 +13,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
 
@@ -57,14 +58,20 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
+        if (from < 0) {
+            throw new BadRequestException("Parameter 'from' must be non-negative");
+        }
+        if (size <= 0) {
+            throw new BadRequestException("Parameter 'size' must be positive");
+        }
+
         Pageable pageable;
+        int page = from / size;
 
         if (sort != null && sort.equalsIgnoreCase("EVENT_DATE")) {
-            pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
-        } else if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
-            pageable = PageRequest.of(from / size, size);
+            pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
         } else {
-            pageable = PageRequest.of(from / size, size);
+            pageable = PageRequest.of(page, size);
         }
 
         LocalDateTime startDateTime = parseDateTime(rangeStart);
@@ -94,6 +101,8 @@ public class PublicEventServiceImpl implements PublicEventService {
                     event.setViews(views);
                     EventShortDto dto = EventMapper.toShortDto(event);
                     dto.setViews(views);
+                    dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
+                            event.getConfirmedRequests() : 0L);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -183,7 +192,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             try {
                 return LocalDateTime.parse(dateTimeStr);
             } catch (Exception e2) {
-                return null;
+                throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss or ISO format");
             }
         }
     }

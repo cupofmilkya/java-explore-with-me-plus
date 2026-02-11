@@ -115,7 +115,7 @@ public class AdminEventServiceImpl implements AdminEventService {
         if (updateRequest.getEventDate() != null) {
             LocalDateTime eventDate = parseDateTime(updateRequest.getEventDate());
             if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-                throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
+                throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
             }
             event.setEventDate(eventDate);
         }
