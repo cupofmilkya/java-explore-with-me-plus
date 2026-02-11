@@ -7,6 +7,7 @@ import ru.practicum.web.admin.dto.CompilationDto;
 import ru.practicum.web.admin.dto.NewCompilationDto;
 import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.entity.UpdateCompilationRequest;
+import ru.practicum.web.admin.mapper.CompilationMapper;
 import ru.practicum.web.admin.repository.CompilationRepository;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
@@ -38,19 +39,14 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
 
         if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
-            List<Event> events = new ArrayList<>();
-            for (Long eventId : dto.getEvents()) {
-                Event event = eventRepository.findById(eventId)
-                        .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
-                events.add(event);
-            }
+            List<Event> events = eventRepository.findAllById(dto.getEvents());
             compilation.setEvents(events);
         } else {
             compilation.setEvents(new ArrayList<>());
         }
 
         Compilation saved = compilationRepository.save(compilation);
-        return toDto(saved);
+        return CompilationMapper.toDto(saved);
     }
 
     @Override
@@ -73,17 +69,12 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         }
 
         if (dto.getEvents() != null) {
-            List<Event> events = new ArrayList<>();
-            for (Long eventId : dto.getEvents()) {
-                Event event = eventRepository.findById(eventId)
-                        .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
-                events.add(event);
-            }
+            List<Event> events = eventRepository.findAllById(dto.getEvents());
             compilation.setEvents(events);
         }
 
         Compilation updated = compilationRepository.save(compilation);
-        return toDto(updated);
+        return CompilationMapper.toDto(updated);
     }
 
     @Override
@@ -92,18 +83,5 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
             throw new NotFoundException("Compilation with id=" + id + " was not found");
         }
         compilationRepository.deleteById(id);
-    }
-
-    private CompilationDto toDto(Compilation compilation) {
-        List<Event> events = compilation.getEvents() != null ?
-                new ArrayList<>(compilation.getEvents()) :
-                new ArrayList<>();
-
-        return CompilationDto.builder()
-                .id(compilation.getId())
-                .title(compilation.getTitle())
-                .pinned(compilation.getPinned())
-                .events(events)
-                .build();
     }
 }

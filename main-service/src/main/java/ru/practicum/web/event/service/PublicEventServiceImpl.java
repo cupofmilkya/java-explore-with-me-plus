@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.statsclient.StatsClient;
@@ -12,6 +13,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
 
 import java.time.LocalDateTime;
@@ -31,16 +33,15 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     @Override
     public EventDto getEvent(Long id) {
-        Event event = eventRepository.findById(id)
-                .filter(e -> e.getStatus() == Event.Status.PUBLISHED)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+        Event event = eventRepository.findByIdAndStatus(id, Event.Status.PUBLISHED)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        Map<Long, Long> viewsMap = getViewsMap(List.of(event));
+        Long views = getViewsForEvent(event);
+        event.setViews(views + 1);
 
         EventDto dto = EventMapper.toDto(event);
-        if (dto != null) {
-            dto.setViews(viewsMap.getOrDefault(event.getId(), 0L));
-        }
+        dto.setViews(views + 1);
+
         return dto;
     }
 
@@ -56,7 +57,15 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
-        Pageable pageable = PageRequest.of(from / size, size);
+        Pageable pageable;
+
+        if (sort != null && sort.equalsIgnoreCase("EVENT_DATE")) {
+            pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+        } else if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
+            pageable = PageRequest.of(from / size, size);
+        } else {
+            pageable = PageRequest.of(from / size, size);
+        }
 
         LocalDateTime startDateTime = parseDateTime(rangeStart);
         LocalDateTime endDateTime = parseDateTime(rangeEnd);
@@ -79,15 +88,21 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Map<Long, Long> viewsMap = getViewsMap(events);
 
-        return events.stream()
+        List<EventShortDto> dtos = events.stream()
                 .map(event -> {
+                    Long views = viewsMap.getOrDefault(event.getId(), 0L);
+                    event.setViews(views);
                     EventShortDto dto = EventMapper.toShortDto(event);
-                    if (dto != null) {
-                        dto.setViews(viewsMap.getOrDefault(event.getId(), 0L));
-                    }
+                    dto.setViews(views);
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
+            dtos.sort((e1, e2) -> Long.compare(e2.getViews(), e1.getViews()));
+        }
+
+        return dtos;
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
@@ -122,6 +137,30 @@ public class PublicEventServiceImpl implements PublicEventService {
                     ));
         } catch (Exception e) {
             return Map.of();
+        }
+    }
+
+    private Long getViewsForEvent(Event event) {
+        if (event.getId() == null) {
+            return 0L;
+        }
+
+        try {
+            LocalDateTime start = event.getCreatedOn() != null ?
+                    event.getCreatedOn() : LocalDateTime.now().minusYears(1);
+
+            String uri = "/events/" + event.getId();
+
+            List<ViewStatsDto> stats = statsClient.getStats(
+                    start,
+                    LocalDateTime.now(),
+                    List.of(uri),
+                    true
+            );
+
+            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+        } catch (Exception e) {
+            return 0L;
         }
     }
 

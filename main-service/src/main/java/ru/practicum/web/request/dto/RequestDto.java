@@ -5,13 +5,16 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EventRequestStatusUpdateResult {
-    private List<RequestDto> confirmedRequests;
-    private List<RequestDto> rejectedRequests;
+public class RequestDto {
+    private Long id;
+    private LocalDateTime created;
+    private Long event;
+    private Long requester;
+    private String status;
 }

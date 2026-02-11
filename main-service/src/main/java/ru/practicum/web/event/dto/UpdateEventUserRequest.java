@@ -1,5 +1,6 @@
 package ru.practicum.web.event.dto;
 
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import ru.practicum.web.event.entity.Location;
@@ -21,6 +22,7 @@ public class UpdateEventUserRequest {
 
     private Boolean paid;
 
+    @PositiveOrZero(message = "Participant limit must be positive or zero")
     private Integer participantLimit;
 
     private Boolean requestModeration;

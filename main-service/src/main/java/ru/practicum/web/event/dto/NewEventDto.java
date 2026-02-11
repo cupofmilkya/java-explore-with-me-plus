@@ -1,8 +1,6 @@
 package ru.practicum.web.event.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,11 +28,12 @@ public class NewEventDto {
     @NotNull(message = "Location must not be null")
     private Location location;
 
-    private Boolean paid;
+    private Boolean paid = false;
 
-    private Integer participantLimit;
+    @PositiveOrZero(message = "Participant limit must be positive or zero")
+    private Integer participantLimit = 0;
 
-    private Boolean requestModeration;
+    private Boolean requestModeration = true;
 
     @NotBlank(message = "Title must not be blank")
     @Size(min = 3, max = 120, message = "Title length must be between 3 and 120 characters")

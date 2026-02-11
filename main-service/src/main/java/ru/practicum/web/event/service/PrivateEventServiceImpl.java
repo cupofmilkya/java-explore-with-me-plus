@@ -5,7 +5,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.admin.repository.CategoryRepository;
@@ -14,6 +13,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.dto.NewEventDto;
 import ru.practicum.web.event.dto.UpdateEventUserRequest;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
@@ -52,8 +52,10 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
         return events.stream()
                 .map(event -> {
-                    EventShortDto dto = toShortDto(event);
+                    EventShortDto dto = EventMapper.toShortDto(event);
                     dto.setViews(viewsMap.getOrDefault(event.getId(), 0L));
+                    dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
+                            event.getConfirmedRequests() : 0L);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -79,18 +81,18 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .eventDate(eventDate)
                 .initiator(user)
                 .category(category)
+                .location(dto.getLocation())
                 .paid(dto.getPaid() != null ? dto.getPaid() : false)
                 .participantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0)
                 .requestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true)
                 .status(Event.Status.PENDING)
                 .createdOn(LocalDateTime.now())
+                .confirmedRequests(0L)
+                .views(0L)
                 .build();
 
         Event saved = eventRepository.save(event);
-
-        sendHitToStats("/events/" + saved.getId());
-
-        return toDto(saved);
+        return EventMapper.toDto(saved);
     }
 
     @Override
@@ -103,10 +105,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         Long views = getViewsForEvent(event);
+        event.setViews(views);
 
-        EventDto dto = toDto(event);
-        dto.setViews(views);
-        return dto;
+        return EventMapper.toDto(event);
     }
 
     @Override
@@ -142,10 +143,16 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             event.setPaid(updateRequest.getPaid());
         }
         if (updateRequest.getParticipantLimit() != null) {
+            if (updateRequest.getParticipantLimit() < 0) {
+                throw new ConflictException("Participant limit must be non-negative");
+            }
             event.setParticipantLimit(updateRequest.getParticipantLimit());
         }
         if (updateRequest.getRequestModeration() != null) {
             event.setRequestModeration(updateRequest.getRequestModeration());
+        }
+        if (updateRequest.getLocation() != null) {
+            event.setLocation(updateRequest.getLocation());
         }
         if (updateRequest.getCategory() != null) {
             var category = categoryRepository.findById(updateRequest.getCategory())
@@ -154,60 +161,21 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
 
         if (updateRequest.getStateAction() != null) {
-            if (updateRequest.getStateAction().equals("SEND_TO_REVIEW")) {
-                event.setStatus(Event.Status.PENDING);
-            } else if (updateRequest.getStateAction().equals("CANCEL_REVIEW")) {
-                event.setStatus(Event.Status.CANCELED);
+            switch (updateRequest.getStateAction()) {
+                case "SEND_TO_REVIEW":
+                    event.setStatus(Event.Status.PENDING);
+                    break;
+                case "CANCEL_REVIEW":
+                    event.setStatus(Event.Status.CANCELED);
+                    break;
             }
         }
 
         Event updated = eventRepository.save(event);
-
         Long views = getViewsForEvent(updated);
+        updated.setViews(views);
 
-        EventDto dto = toDto(updated);
-        dto.setViews(views);
-        return dto;
-    }
-
-    private EventShortDto toShortDto(Event event) {
-        return EventShortDto.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .annotation(event.getAnnotation())
-                .category(new ru.practicum.web.admin.dto.CategoryDto(event.getCategory().getId(), event.getCategory().getName()))
-                .paid(event.getPaid() != null ? event.getPaid() : false)
-                .eventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null)
-                .initiator(new ru.practicum.web.admin.dto.UserShortDto(event.getInitiator().getId(), event.getInitiator().getName()))
-                .confirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L)
-                .build();
-    }
-
-    private EventDto toDto(Event event) {
-        EventDto result = EventDto.builder()
-                .id(event.getId())
-                .title(event.getTitle())
-                .annotation(event.getAnnotation())
-                .description(event.getDescription())
-                .eventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null)
-                .category(new ru.practicum.web.admin.dto.CategoryDto(event.getCategory().getId(), event.getCategory().getName()))
-                .initiator(new ru.practicum.web.admin.dto.UserShortDto(event.getInitiator().getId(), event.getInitiator().getName()))
-                .paid(event.getPaid() != null ? event.getPaid() : false)
-                .participantLimit(event.getParticipantLimit() != null ? event.getParticipantLimit() : 0)
-                .requestModeration(event.getRequestModeration() != null ? event.getRequestModeration() : true)
-                .state(event.getStatus() != null ? event.getStatus().name() : null)
-                .confirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L)
-                .build();
-
-        if (event.getCreatedOn() != null) {
-            result.setCreatedOn(event.getCreatedOn().format(FORMATTER));
-        }
-
-        if (event.getPublishedOn() != null) {
-            result.setPublishedOn(event.getPublishedOn().format(FORMATTER));
-        }
-
-        return result;
+        return EventMapper.toDto(updated);
     }
 
     private LocalDateTime parseDateTime(String dateTimeStr) {
@@ -278,7 +246,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+            return stats.isEmpty() ? 0L : stats.get(0).getHits();
         } catch (Exception e) {
             return 0L;
         }
@@ -290,21 +258,6 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             return Long.parseLong(parts[parts.length - 1]);
         } catch (Exception e) {
             return null;
-        }
-    }
-
-    private void sendHitToStats(String uri) {
-        try {
-            statsClient.hit(
-                    EndpointHitDto.builder()
-                            .app("ewm-main-service")
-                            .uri(uri)
-                            .ip("0.0.0.0")
-                            .timestamp(LocalDateTime.now())
-                            .build()
-            );
-        } catch (Exception e) {
-            // Игнорируем ошибки при отправке статистики
         }
     }
 }

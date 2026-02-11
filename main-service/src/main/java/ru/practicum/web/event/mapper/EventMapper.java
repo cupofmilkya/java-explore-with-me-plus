@@ -23,26 +23,15 @@ public class EventMapper {
         dto.setTitle(event.getTitle());
         dto.setAnnotation(event.getAnnotation());
         dto.setDescription(event.getDescription());
-
-        if (event.getEventDate() != null) {
-            dto.setEventDate(event.getEventDate().format(FORMATTER));
-        }
-
-        if (event.getStatus() != null) {
-            dto.setState(event.getStatus().name());
-        }
-
+        dto.setEventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null);
+        dto.setState(event.getStatus() != null ? event.getStatus().name() : Event.Status.PENDING.name());
         dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
         dto.setParticipantLimit(event.getParticipantLimit() != null ? event.getParticipantLimit() : 0);
         dto.setRequestModeration(event.getRequestModeration() != null ? event.getRequestModeration() : true);
-
-        if (event.getCreatedOn() != null) {
-            dto.setCreatedOn(event.getCreatedOn().format(FORMATTER));
-        }
-
-        if (event.getPublishedOn() != null) {
-            dto.setPublishedOn(event.getPublishedOn().format(FORMATTER));
-        }
+        dto.setCreatedOn(event.getCreatedOn() != null ? event.getCreatedOn().format(FORMATTER) : null);
+        dto.setPublishedOn(event.getPublishedOn() != null ? event.getPublishedOn().format(FORMATTER) : null);
+        dto.setViews(event.getViews() != null ? event.getViews() : 0L);
+        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
 
         if (event.getCategory() != null) {
             CategoryDto categoryDto = new CategoryDto();
@@ -57,23 +46,6 @@ public class EventMapper {
             userDto.setName(event.getInitiator().getName());
             dto.setInitiator(userDto);
         }
-
-        try {
-            var viewsField = event.getClass().getDeclaredField("views");
-            viewsField.setAccessible(true);
-            Object viewsValue = viewsField.get(event);
-            if (viewsValue instanceof Integer) {
-                dto.setViews(((Integer) viewsValue).longValue());
-            } else if (viewsValue instanceof Long) {
-                dto.setViews((Long) viewsValue);
-            } else {
-                dto.setViews(0L);
-            }
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            dto.setViews(0L);
-        }
-
-        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
 
         return dto;
     }
@@ -107,13 +79,13 @@ public class EventMapper {
             } catch (IllegalArgumentException e) {
                 event.setStatus(Event.Status.PENDING);
             }
-        } else {
-            event.setStatus(Event.Status.PENDING);
         }
 
         event.setPaid(dto.getPaid() != null ? dto.getPaid() : false);
         event.setParticipantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0);
         event.setRequestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true);
+        event.setConfirmedRequests(dto.getConfirmedRequests() != null ? dto.getConfirmedRequests() : 0L);
+        event.setViews(dto.getViews() != null ? dto.getViews() : 0L);
 
         if (dto.getCreatedOn() != null && !dto.getCreatedOn().isEmpty()) {
             try {
@@ -170,6 +142,14 @@ public class EventMapper {
         if (dto.getRequestModeration() != null) {
             event.setRequestModeration(dto.getRequestModeration());
         }
+
+        if (dto.getConfirmedRequests() != null) {
+            event.setConfirmedRequests(dto.getConfirmedRequests());
+        }
+
+        if (dto.getViews() != null) {
+            event.setViews(dto.getViews());
+        }
     }
 
     public static EventShortDto toShortDto(Event event) {
@@ -181,12 +161,10 @@ public class EventMapper {
         dto.setId(event.getId());
         dto.setTitle(event.getTitle());
         dto.setAnnotation(event.getAnnotation());
-
-        if (event.getEventDate() != null) {
-            dto.setEventDate(event.getEventDate().format(FORMATTER));
-        }
-
+        dto.setEventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null);
         dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
+        dto.setViews(event.getViews() != null ? event.getViews() : 0L);
+        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
 
         if (event.getCategory() != null) {
             CategoryDto categoryDto = new CategoryDto();
@@ -201,24 +179,6 @@ public class EventMapper {
             userDto.setName(event.getInitiator().getName());
             dto.setInitiator(userDto);
         }
-
-        try {
-            var viewsField = event.getClass().getDeclaredField("views");
-            viewsField.setAccessible(true);
-            Object viewsValue = viewsField.get(event);
-            if (viewsValue instanceof Integer) {
-                dto.setViews(((Integer) viewsValue).longValue());
-            } else if (viewsValue instanceof Long) {
-                dto.setViews((Long) viewsValue);
-            } else {
-                dto.setViews(0L);
-            }
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            dto.setViews(0L);
-        }
-
-        dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
-                event.getConfirmedRequests() : 0L);
 
         return dto;
     }

@@ -66,9 +66,9 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
 
         Page<Event> eventPage = eventRepository.findEventsByAdminFilters(
-                (users == null || users.isEmpty()) ? null : users,
+                users != null && !users.isEmpty() ? users : null,
                 statusEnums,
-                (categories == null || categories.isEmpty()) ? null : categories,
+                categories != null && !categories.isEmpty() ? categories : null,
                 start,
                 end,
                 pageable
@@ -91,7 +91,6 @@ public class AdminEventServiceImpl implements AdminEventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        // Валидация полей
         if (updateRequest.getTitle() != null) {
             if (updateRequest.getTitle().length() < 3 || updateRequest.getTitle().length() > 120) {
                 throw new BadRequestException("Title length must be between 3 and 120 characters");
@@ -142,8 +141,8 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
 
         if (updateRequest.getStateAction() != null) {
-            switch (updateRequest.getStateAction().toUpperCase()) {
-                case "PUBLISH_EVENT" -> {
+            switch (updateRequest.getStateAction()) {
+                case "PUBLISH_EVENT":
                     if (event.getStatus() != Event.Status.PENDING) {
                         throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getStatus());
                     }
@@ -152,15 +151,15 @@ public class AdminEventServiceImpl implements AdminEventService {
                     }
                     event.setStatus(Event.Status.PUBLISHED);
                     event.setPublishedOn(LocalDateTime.now());
-                }
-                case "REJECT_EVENT" -> {
+                    break;
+                case "REJECT_EVENT":
                     if (event.getStatus() == Event.Status.PUBLISHED) {
                         throw new ConflictException("Cannot reject already published event");
                     }
                     event.setStatus(Event.Status.CANCELED);
-                }
-                default ->
-                        throw new BadRequestException("Invalid state action: " + updateRequest.getStateAction());
+                    break;
+                default:
+                    throw new BadRequestException("Invalid state action: " + updateRequest.getStateAction());
             }
         }
 

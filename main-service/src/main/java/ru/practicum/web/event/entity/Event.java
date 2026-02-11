@@ -44,17 +44,17 @@ public class Event {
     private Location location;
 
     @Column(nullable = false)
-    private Boolean paid;
+    private Boolean paid = false;
 
     @Column(name = "participant_limit", nullable = false)
-    private Integer participantLimit;
+    private Integer participantLimit = 0;
 
     @Column(name = "request_moderation", nullable = false)
-    private Boolean requestModeration;
+    private Boolean requestModeration = true;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status;
+    private Status status = Status.PENDING;
 
     @Column(name = "created_on", nullable = false)
     private LocalDateTime createdOn;
@@ -63,7 +63,7 @@ public class Event {
     private LocalDateTime publishedOn;
 
     @Column(name = "confirmed_requests", nullable = false)
-    private Integer confirmedRequests = 0;
+    private Long confirmedRequests = 0L;
 
     @Transient
     private Long views = 0L;
