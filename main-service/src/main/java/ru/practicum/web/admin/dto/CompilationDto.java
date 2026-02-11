@@ -1,7 +1,7 @@
 package ru.practicum.web.admin.dto;
 
 import lombok.*;
-import ru.practicum.web.event.dto.EventShortDto;
+import ru.practicum.web.event.entity.Event;
 
 import java.util.List;
 
@@ -13,5 +13,5 @@ public class CompilationDto {
     private Long id;
     private String title;
     private Boolean pinned;
-    private List<EventShortDto> events;
+    private List<Event> events;
 }

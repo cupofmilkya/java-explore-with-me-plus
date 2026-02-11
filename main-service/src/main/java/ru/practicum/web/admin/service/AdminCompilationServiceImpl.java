@@ -8,16 +8,13 @@ import ru.practicum.web.admin.dto.NewCompilationDto;
 import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 import ru.practicum.web.admin.repository.CompilationRepository;
-import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
-import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -98,17 +95,15 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
     }
 
     private CompilationDto toDto(Compilation compilation) {
-        List<EventShortDto> eventDtos = compilation.getEvents() != null ?
-                compilation.getEvents().stream()
-                        .map(EventMapper::toShortDto)
-                        .collect(Collectors.toList()) :
+        List<Event> events = compilation.getEvents() != null ?
+                new ArrayList<>(compilation.getEvents()) :
                 new ArrayList<>();
 
         return CompilationDto.builder()
                 .id(compilation.getId())
                 .title(compilation.getTitle())
                 .pinned(compilation.getPinned())
-                .events(eventDtos)
+                .events(events)
                 .build();
     }
 }
