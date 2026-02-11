@@ -20,6 +20,7 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +62,6 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
-        // Валидация входных параметров
         if (from < 0) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
@@ -99,17 +99,27 @@ public class PublicEventServiceImpl implements PublicEventService {
             startDateTime = LocalDateTime.now();
         }
 
-        Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
-                text, categories, paid, startDateTime, endDateTime,
-                onlyAvailable != null ? onlyAvailable : false, pageable
-        );
+        Page<Event> eventPage;
+        try {
+            eventPage = eventRepository.findPublicEventsWithFilters(
+                    text,
+                    categories,
+                    paid,
+                    startDateTime,
+                    endDateTime,
+                    onlyAvailable != null ? onlyAvailable : false,
+                    pageable
+            );
+        } catch (Exception e) {
+            log.error("Error in repository call: ", e);
+            throw new BadRequestException("Error while filtering events: " + e.getMessage());
+        }
 
         List<Event> events = eventPage.getContent();
-        log.info("Found {} events, total pages: {}, total elements: {}",
-                events.size(), eventPage.getTotalPages(), eventPage.getTotalElements());
+        log.info("Found {} events", events.size());
 
         if (events.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
 
         Map<Long, Long> viewsMap = getViewsMap(events);
@@ -117,7 +127,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         List<EventShortDto> result = events.stream()
                 .map(event -> {
                     Long views = viewsMap.getOrDefault(event.getId(), 0L);
-                    event.setViews(views);
                     EventShortDto dto = EventMapper.toShortDto(event);
                     dto.setViews(views);
                     dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
@@ -126,17 +135,23 @@ public class PublicEventServiceImpl implements PublicEventService {
                 })
                 .collect(Collectors.toList());
 
-        // Сортировка если указана
-        if ("EVENT_DATE".equals(sort)) {
-            result.sort((e1, e2) -> {
-                if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
-                return e1.getEventDate().compareTo(e2.getEventDate());
-            });
-        } else if ("VIEWS".equals(sort)) {
-            result.sort((e1, e2) -> {
-                if (e1.getViews() == null || e2.getViews() == null) return 0;
-                return e1.getViews().compareTo(e2.getViews());
-            });
+        // Сортировка
+        if (sort != null) {
+            try {
+                if ("EVENT_DATE".equals(sort)) {
+                    result.sort((e1, e2) -> {
+                        if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
+                        return e1.getEventDate().compareTo(e2.getEventDate());
+                    });
+                } else if ("VIEWS".equals(sort)) {
+                    result.sort((e1, e2) -> {
+                        if (e1.getViews() == null || e2.getViews() == null) return 0;
+                        return e1.getViews().compareTo(e2.getViews());
+                    });
+                }
+            } catch (Exception e) {
+                log.error("Error during sorting: ", e);
+            }
         }
 
         return result;
@@ -165,8 +180,12 @@ public class PublicEventServiceImpl implements PublicEventService {
                     true
             );
 
+            if (stats == null) {
+                return Map.of();
+            }
+
             return stats.stream()
-                    .filter(stat -> stat.getUri() != null)
+                    .filter(stat -> stat != null && stat.getUri() != null)
                     .collect(Collectors.toMap(
                             stat -> extractEventIdFromUri(stat.getUri()),
                             ViewStatsDto::getHits,
@@ -183,7 +202,7 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Long getViewsForEvent(Event event) {
-        if (event.getId() == null) {
+        if (event == null || event.getId() == null) {
             return 0L;
         }
 
@@ -200,7 +219,10 @@ public class PublicEventServiceImpl implements PublicEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+            if (stats == null || stats.isEmpty()) {
+                return 0L;
+            }
+            return stats.get(0).getHits();
         } catch (Exception e) {
             log.error("Error getting views for event {}: {}", event.getId(), e.getMessage());
             return 0L;
@@ -208,10 +230,17 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Long extractEventIdFromUri(String uri) {
+        if (uri == null) {
+            return null;
+        }
         try {
             String[] parts = uri.split("/");
-            return Long.parseLong(parts[parts.length - 1]);
+            if (parts.length > 0) {
+                return Long.parseLong(parts[parts.length - 1]);
+            }
+            return null;
         } catch (Exception e) {
+            log.error("Error extracting event id from uri: {}", uri, e);
             return null;
         }
     }
@@ -229,7 +258,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                 try {
                     return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
                 } catch (DateTimeParseException e3) {
-                    throw new DateTimeParseException("Invalid date format", dateTimeStr, 0);
+                    throw new DateTimeParseException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss", dateTimeStr, 0);
                 }
             }
         }
