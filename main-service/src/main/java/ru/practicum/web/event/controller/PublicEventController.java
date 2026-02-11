@@ -37,6 +37,7 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
+        log.info("GET /events with params: from={}, size={}", from, size);
         if (from < 0) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
@@ -44,29 +45,19 @@ public class PublicEventController {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
 
-        if (rangeStart != null && rangeEnd != null) {
-            try {
-                LocalDateTime start = LocalDateTime.parse(rangeStart.replace(" ", "T"));
-                LocalDateTime end = LocalDateTime.parse(rangeEnd.replace(" ", "T"));
-                if (start.isAfter(end)) {
-                    throw new BadRequestException("rangeStart must be before rangeEnd");
-                }
-            } catch (Exception e) {
-                throw new BadRequestException("Invalid date format");
-            }
-        }
-
         hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size
         );
+        log.info("GET /events returned {} events", events.size());
         return ResponseEntity.ok(events);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<EventDto> getEvent(@PathVariable Long id,
                                              HttpServletRequest request) {
+        log.info("GET /events/{}", id);
         hitStats(request);
         EventDto event = publicEventService.getEvent(id);
         return ResponseEntity.ok(event);

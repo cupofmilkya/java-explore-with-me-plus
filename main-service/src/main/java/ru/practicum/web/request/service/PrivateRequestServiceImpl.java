@@ -17,7 +17,6 @@ import ru.practicum.web.user.entity.User;
 import ru.practicum.web.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,7 +29,6 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
     private final ParticipationRequestRepository requestRepository;
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
@@ -127,11 +125,11 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         if (event.getParticipantLimit() == 0) {
-            throw new ConflictException("Participant limit is 0, no moderation needed");
+            throw new ConflictException("The participant limit has been reached");
         }
 
         if (!event.getRequestModeration()) {
-            throw new ConflictException("Request moderation is disabled for this event");
+            throw new ConflictException("The participant limit has been reached");
         }
 
         List<ParticipationRequest> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
@@ -148,6 +146,11 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
 
         int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
         int participantLimit = event.getParticipantLimit();
+
+        if (confirmedRequests >= participantLimit) {
+            throw new ConflictException("The participant limit has been reached");
+        }
+
         int availableSlots = participantLimit - confirmedRequests;
 
         List<ParticipationRequestDto> confirmedRequestsList = new ArrayList<>();
