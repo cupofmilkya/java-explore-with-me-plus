@@ -35,7 +35,6 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("User with id=" + userId + " was not found");
         }
-
         return requestRepository.findAllByRequesterId(userId).stream()
                 .map(ParticipationRequestMapper::toDto)
                 .collect(Collectors.toList());
@@ -45,30 +44,26 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
     public ParticipationRequestDto addRequest(Long userId, Long eventId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
-
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         if (event.getInitiator().getId().equals(userId)) {
             throw new ConflictException("Initiator cannot participate in his own event");
         }
-
         if (event.getStatus() != Event.Status.PUBLISHED) {
             throw new ConflictException("Event is not published");
         }
-
         if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
             throw new ConflictException("Request already exists");
         }
 
         int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
-
         if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
             throw new ConflictException("Participant limit reached");
         }
 
         ParticipationRequest request = ParticipationRequest.builder()
-                .created(LocalDateTime.now())
+                .created(LocalDateTime.now().withNano(0))
                 .event(event)
                 .requester(user)
                 .status(event.getParticipantLimit() == 0 || !event.getRequestModeration()
@@ -77,12 +72,10 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                 .build();
 
         ParticipationRequest saved = requestRepository.save(request);
-
         if (saved.getStatus() == ParticipationRequest.RequestStatus.CONFIRMED) {
             event.setConfirmedRequests(event.getConfirmedRequests() + 1);
             eventRepository.save(event);
         }
-
         return ParticipationRequestMapper.toDto(saved);
     }
 
@@ -90,14 +83,11 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         ParticipationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
-
         if (!request.getRequester().getId().equals(userId)) {
             throw new NotFoundException("Request not found");
         }
-
         request.setStatus(ParticipationRequest.RequestStatus.CANCELED);
         ParticipationRequest updated = requestRepository.save(request);
-
         return ParticipationRequestMapper.toDto(updated);
     }
 
@@ -106,10 +96,8 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("User with id=" + userId + " was not found");
         }
-
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
-
         return requestRepository.findAllByEventId(eventId).stream()
                 .map(ParticipationRequestMapper::toDto)
                 .collect(Collectors.toList());
@@ -127,13 +115,11 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         if (event.getParticipantLimit() == 0) {
             throw new ConflictException("The participant limit has been reached");
         }
-
         if (!event.getRequestModeration()) {
             throw new ConflictException("The participant limit has been reached");
         }
 
         List<ParticipationRequest> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
-
         if (requests.isEmpty()) {
             throw new ConflictException("Request ids list is empty");
         }
@@ -152,7 +138,6 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         }
 
         int availableSlots = participantLimit - confirmedRequests;
-
         List<ParticipationRequestDto> confirmedRequestsList = new ArrayList<>();
         List<ParticipationRequestDto> rejectedRequestsList = new ArrayList<>();
 
@@ -162,7 +147,6 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                     throw new ConflictException("Request must have status PENDING");
                 }
             }
-
             int confirmedCount = 0;
             for (ParticipationRequest request : requests) {
                 if (confirmedCount < availableSlots) {
@@ -175,17 +159,14 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                 }
                 requestRepository.save(request);
             }
-
             event.setConfirmedRequests(event.getConfirmedRequests() + confirmedCount);
             eventRepository.save(event);
-
         } else if ("REJECTED".equals(statusUpdateRequest.getStatus())) {
             for (ParticipationRequest request : requests) {
                 if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
                     throw new ConflictException("Request must have status PENDING");
                 }
             }
-
             for (ParticipationRequest request : requests) {
                 request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
                 requestRepository.save(request);

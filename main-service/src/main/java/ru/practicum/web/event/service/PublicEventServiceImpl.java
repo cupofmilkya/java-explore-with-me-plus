@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.statsclient.StatsClient;
@@ -68,44 +67,27 @@ public class PublicEventServiceImpl implements PublicEventService {
         }
 
         int page = from / size;
-        Pageable pageable;
-
-        if (sort != null && sort.equalsIgnoreCase("EVENT_DATE")) {
-            pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
-        } else {
-            pageable = PageRequest.of(page, size);
-        }
+        Pageable pageable = PageRequest.of(page, size);
 
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
-        try {
-            if (rangeStart != null && !rangeStart.isBlank()) {
-                startDateTime = parseDateTime(rangeStart);
-            }
-            if (rangeEnd != null && !rangeEnd.isBlank()) {
-                endDateTime = parseDateTime(rangeEnd);
-            }
-        } catch (Exception e) {
-            throw new BadRequestException("Invalid date format");
+        if (rangeStart != null && !rangeStart.isBlank()) {
+            startDateTime = parseDateTime(rangeStart);
         }
-
+        if (rangeEnd != null && !rangeEnd.isBlank()) {
+            endDateTime = parseDateTime(rangeEnd);
+        }
         if (startDateTime == null) {
             startDateTime = LocalDateTime.now();
         }
 
         Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
-                text,
-                categories,
-                paid,
-                startDateTime,
-                endDateTime,
-                onlyAvailable != null ? onlyAvailable : false,
-                pageable
+                text, categories, paid, startDateTime, endDateTime,
+                onlyAvailable != null ? onlyAvailable : false, pageable
         );
 
         List<Event> events = eventPage.getContent();
-
         Map<Long, Long> viewsMap = getViewsMap(events);
 
         List<EventShortDto> dtos = events.stream()
@@ -123,7 +105,6 @@ public class PublicEventServiceImpl implements PublicEventService {
         if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
             dtos.sort((e1, e2) -> Long.compare(e2.getViews(), e1.getViews()));
         }
-
         return dtos;
     }
 

@@ -37,20 +37,17 @@ public class PublicEventController {
             @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request
     ) {
-        log.info("GET /events with params: from={}, size={}", from, size);
         if (from < 0) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
         if (size <= 0) {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
-
         hitStats(request);
         List<EventShortDto> events = publicEventService.getEvents(
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size
         );
-        log.info("GET /events returned {} events", events.size());
         return ResponseEntity.ok(events);
     }
 
