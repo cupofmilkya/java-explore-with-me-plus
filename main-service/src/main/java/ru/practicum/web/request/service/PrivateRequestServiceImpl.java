@@ -5,19 +5,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
-import ru.practicum.web.request.dto.RequestDto;
-import ru.practicum.web.request.entity.Request;
-import ru.practicum.web.request.mapper.RequestMapper;
-import ru.practicum.web.request.repository.RequestRepository;
+import ru.practicum.web.request.dto.ParticipationRequestDto;
+import ru.practicum.web.request.entity.ParticipationRequest;
+import ru.practicum.web.request.mapper.ParticipationRequestMapper;
+import ru.practicum.web.request.repository.ParticipationRequestRepository;
 import ru.practicum.web.user.entity.User;
 import ru.practicum.web.user.repository.UserRepository;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,23 +27,24 @@ import java.util.stream.Collectors;
 @Transactional
 public class PrivateRequestServiceImpl implements PrivateRequestService {
 
-    private final RequestRepository requestRepository;
+    private final ParticipationRequestRepository requestRepository;
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
-    public List<RequestDto> getUserRequests(Long userId) {
+    public List<ParticipationRequestDto> getUserRequests(Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("User with id=" + userId + " was not found");
         }
 
         return requestRepository.findAllByRequesterId(userId).stream()
-                .map(RequestMapper::toDto)
+                .map(ParticipationRequestMapper::toDto)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public RequestDto addRequest(Long userId, Long eventId) {
+    public ParticipationRequestDto addRequest(Long userId, Long eventId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
 
@@ -58,49 +59,52 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             throw new ConflictException("Event is not published");
         }
 
-        if (requestRepository.existsByRequesterIdAndEventId(userId, eventId)) {
+        if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
             throw new ConflictException("Request already exists");
         }
 
-        Long confirmedRequests = requestRepository.countConfirmedRequests(eventId);
+        int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
+
         if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
             throw new ConflictException("Participant limit reached");
         }
 
-        Request request = Request.builder()
-                .created(LocalDateTime.now().withNano(0))
+        ParticipationRequest request = ParticipationRequest.builder()
+                .created(LocalDateTime.now())
                 .event(event)
                 .requester(user)
-                .status(event.getParticipantLimit() == 0 ? Request.Status.CONFIRMED : Request.Status.PENDING)
+                .status(event.getParticipantLimit() == 0 || !event.getRequestModeration()
+                        ? ParticipationRequest.RequestStatus.CONFIRMED
+                        : ParticipationRequest.RequestStatus.PENDING)
                 .build();
 
-        Request saved = requestRepository.save(request);
+        ParticipationRequest saved = requestRepository.save(request);
 
-        if (event.getParticipantLimit() == 0) {
-            event.setConfirmedRequests(confirmedRequests + 1);
+        if (saved.getStatus() == ParticipationRequest.RequestStatus.CONFIRMED) {
+            event.setConfirmedRequests(event.getConfirmedRequests() + 1);
             eventRepository.save(event);
         }
 
-        return RequestMapper.toDto(saved);
+        return ParticipationRequestMapper.toDto(saved);
     }
 
     @Override
-    public RequestDto cancelRequest(Long userId, Long requestId) {
-        Request request = requestRepository.findById(requestId)
+    public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
+        ParticipationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
 
         if (!request.getRequester().getId().equals(userId)) {
             throw new NotFoundException("Request not found");
         }
 
-        request.setStatus(Request.Status.CANCELED);
-        Request updated = requestRepository.save(request);
+        request.setStatus(ParticipationRequest.RequestStatus.CANCELED);
+        ParticipationRequest updated = requestRepository.save(request);
 
-        return RequestMapper.toDto(updated);
+        return ParticipationRequestMapper.toDto(updated);
     }
 
     @Override
-    public List<RequestDto> getEventRequests(Long userId, Long eventId) {
+    public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("User with id=" + userId + " was not found");
         }
@@ -109,7 +113,7 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         return requestRepository.findAllByEventId(eventId).stream()
-                .map(RequestMapper::toDto)
+                .map(ParticipationRequestMapper::toDto)
                 .collect(Collectors.toList());
     }
 
@@ -123,58 +127,56 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         if (event.getParticipantLimit() == 0) {
-            throw new ConflictException("Request moderation is disabled for this event");
+            throw new ConflictException("Participant limit is 0, no moderation needed");
         }
 
-        if (!event.getRequestModeration()) {
-            throw new ConflictException("Request moderation is disabled for this event");
-        }
-
-        List<Request> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
+        List<ParticipationRequest> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
 
         if (requests.isEmpty()) {
-            throw new BadRequestException("Request ids list is empty");
+            throw new ConflictException("Request ids list is empty");
         }
 
-        for (Request request : requests) {
+        for (ParticipationRequest request : requests) {
             if (!request.getEvent().getId().equals(eventId)) {
                 throw new NotFoundException("Request with id=" + request.getId() + " not found for this event");
             }
-            if (request.getStatus() != Request.Status.PENDING) {
+            if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
                 throw new ConflictException("Request must have status PENDING");
             }
         }
 
-        Long confirmedRequests = requestRepository.countConfirmedRequests(eventId);
+        int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
         int participantLimit = event.getParticipantLimit();
+        int availableSlots = participantLimit - confirmedRequests;
 
-        List<RequestDto> confirmedRequestsList = new ArrayList<>();
-        List<RequestDto> rejectedRequestsList = new ArrayList<>();
+        List<ParticipationRequestDto> confirmedRequestsList = new ArrayList<>();
+        List<ParticipationRequestDto> rejectedRequestsList = new ArrayList<>();
 
         if ("CONFIRMED".equals(statusUpdateRequest.getStatus())) {
-            for (Request request : requests) {
-                if (confirmedRequests < participantLimit) {
-                    request.setStatus(Request.Status.CONFIRMED);
-                    confirmedRequests++;
-                    confirmedRequestsList.add(RequestMapper.toDto(request));
+            int confirmedCount = 0;
+            for (ParticipationRequest request : requests) {
+                if (confirmedCount < availableSlots) {
+                    request.setStatus(ParticipationRequest.RequestStatus.CONFIRMED);
+                    confirmedCount++;
+                    confirmedRequestsList.add(ParticipationRequestMapper.toDto(request));
                 } else {
-                    request.setStatus(Request.Status.REJECTED);
-                    rejectedRequestsList.add(RequestMapper.toDto(request));
+                    request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
+                    rejectedRequestsList.add(ParticipationRequestMapper.toDto(request));
                 }
                 requestRepository.save(request);
             }
 
-            event.setConfirmedRequests(confirmedRequests);
+            event.setConfirmedRequests(event.getConfirmedRequests() + confirmedCount);
             eventRepository.save(event);
 
         } else if ("REJECTED".equals(statusUpdateRequest.getStatus())) {
-            for (Request request : requests) {
-                request.setStatus(Request.Status.REJECTED);
+            for (ParticipationRequest request : requests) {
+                request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
                 requestRepository.save(request);
-                rejectedRequestsList.add(RequestMapper.toDto(request));
+                rejectedRequestsList.add(ParticipationRequestMapper.toDto(request));
             }
         } else {
-            throw new BadRequestException("Invalid status: " + statusUpdateRequest.getStatus());
+            throw new ConflictException("Invalid status: " + statusUpdateRequest.getStatus());
         }
 
         return EventRequestStatusUpdateResult.builder()

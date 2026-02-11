@@ -5,7 +5,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
-import ru.practicum.web.request.dto.RequestDto;
+import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
+import ru.practicum.web.request.dto.ParticipationRequestDto;
 import ru.practicum.web.request.service.PrivateRequestService;
 
 import java.util.List;
@@ -17,21 +18,21 @@ public class PrivateRequestController {
     private final PrivateRequestService requestService;
 
     @GetMapping("/users/{userId}/requests")
-    public ResponseEntity<List<RequestDto>> getUserRequests(@PathVariable Long userId) {
+    public ResponseEntity<List<ParticipationRequestDto>> getUserRequests(@PathVariable Long userId) {
         return ResponseEntity.ok(requestService.getUserRequests(userId));
     }
 
     @PostMapping("/users/{userId}/requests")
-    public ResponseEntity<RequestDto> addRequest(
+    public ResponseEntity<ParticipationRequestDto> addRequest(
             @PathVariable Long userId,
             @RequestParam Long eventId
     ) {
-        RequestDto created = requestService.addRequest(userId, eventId);
+        ParticipationRequestDto created = requestService.addRequest(userId, eventId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PatchMapping("/users/{userId}/requests/{requestId}/cancel")
-    public ResponseEntity<RequestDto> cancelRequest(
+    public ResponseEntity<ParticipationRequestDto> cancelRequest(
             @PathVariable Long userId,
             @PathVariable Long requestId
     ) {
@@ -39,7 +40,7 @@ public class PrivateRequestController {
     }
 
     @GetMapping("/users/{userId}/events/{eventId}/requests")
-    public ResponseEntity<List<RequestDto>> getEventRequests(
+    public ResponseEntity<List<ParticipationRequestDto>> getEventRequests(
             @PathVariable Long userId,
             @PathVariable Long eventId
     ) {
@@ -47,7 +48,7 @@ public class PrivateRequestController {
     }
 
     @PatchMapping("/users/{userId}/events/{eventId}/requests")
-    public ResponseEntity<Object> updateRequestsStatus(
+    public ResponseEntity<EventRequestStatusUpdateResult> updateRequestsStatus(
             @PathVariable Long userId,
             @PathVariable Long eventId,
             @RequestBody EventRequestStatusUpdateRequest statusUpdateRequest

@@ -1,7 +1,6 @@
 package ru.practicum.web.exception;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.coyote.BadRequestException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -149,7 +148,7 @@ public class ErrorHandler {
             message = "User with this email already exists";
         } else if (message.contains("categories_name_key") || message.contains("uq_category_name")) {
             message = "Category with this name already exists";
-        } else if (message.contains("uq_request")) {
+        } else if (message.contains("uq_request") || message.contains("requests_event_id_requester_id_key")) {
             message = "Request already exists";
         }
 

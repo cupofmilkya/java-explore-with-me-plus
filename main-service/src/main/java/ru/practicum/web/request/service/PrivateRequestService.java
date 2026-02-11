@@ -1,20 +1,20 @@
 package ru.practicum.web.request.service;
 
-import ru.practicum.web.request.dto.RequestDto;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
+import ru.practicum.web.request.dto.ParticipationRequestDto;
 
 import java.util.List;
 
 public interface PrivateRequestService {
 
-    List<RequestDto> getUserRequests(Long userId);
+    List<ParticipationRequestDto> getUserRequests(Long userId);
 
-    RequestDto addRequest(Long userId, Long eventId);
+    ParticipationRequestDto addRequest(Long userId, Long eventId);
 
-    RequestDto cancelRequest(Long userId, Long requestId);
+    ParticipationRequestDto cancelRequest(Long userId, Long requestId);
 
-    List<RequestDto> getEventRequests(Long userId, Long eventId);
+    List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId);
 
     EventRequestStatusUpdateResult updateRequestsStatus(
             Long userId,
