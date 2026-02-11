@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
@@ -62,12 +63,12 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         }
 
         Long confirmedRequests = requestRepository.countConfirmedRequests(eventId);
-        if (event.getParticipantLimit() != 0 && confirmedRequests >= event.getParticipantLimit()) {
+        if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
             throw new ConflictException("Participant limit reached");
         }
 
         Request request = Request.builder()
-                .created(LocalDateTime.now())
+                .created(LocalDateTime.now().withNano(0))
                 .event(event)
                 .requester(user)
                 .status(event.getParticipantLimit() == 0 ? Request.Status.CONFIRMED : Request.Status.PENDING)
@@ -131,19 +132,20 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             if (!request.getEvent().getId().equals(eventId)) {
                 throw new NotFoundException("Request with id=" + request.getId() + " not found for this event");
             }
+            if (request.getStatus() != Request.Status.PENDING) {
+                throw new ConflictException("Request must have status PENDING");
+            }
         }
 
         Long confirmedRequests = requestRepository.countConfirmedRequests(eventId);
+        int participantLimit = event.getParticipantLimit();
+
         List<RequestDto> confirmedRequestsList = new ArrayList<>();
         List<RequestDto> rejectedRequestsList = new ArrayList<>();
 
         if ("CONFIRMED".equals(statusUpdateRequest.getStatus())) {
             for (Request request : requests) {
-                if (request.getStatus() != Request.Status.PENDING) {
-                    throw new ConflictException("Request must have status PENDING");
-                }
-
-                if (confirmedRequests < event.getParticipantLimit()) {
+                if (confirmedRequests < participantLimit) {
                     request.setStatus(Request.Status.CONFIRMED);
                     confirmedRequests++;
                     confirmedRequestsList.add(RequestMapper.toDto(request));
@@ -159,13 +161,12 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
 
         } else if ("REJECTED".equals(statusUpdateRequest.getStatus())) {
             for (Request request : requests) {
-                if (request.getStatus() != Request.Status.PENDING) {
-                    throw new ConflictException("Request must have status PENDING");
-                }
                 request.setStatus(Request.Status.REJECTED);
                 requestRepository.save(request);
                 rejectedRequestsList.add(RequestMapper.toDto(request));
             }
+        } else {
+            throw new BadRequestException("Invalid status: " + statusUpdateRequest.getStatus());
         }
 
         return EventRequestStatusUpdateResult.builder()

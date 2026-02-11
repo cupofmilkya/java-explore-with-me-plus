@@ -32,6 +32,7 @@ public class EventMapper {
         dto.setPublishedOn(event.getPublishedOn() != null ? event.getPublishedOn().format(FORMATTER) : null);
         dto.setViews(event.getViews() != null ? event.getViews() : 0L);
         dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
+        dto.setLocation(event.getLocation());
 
         if (event.getCategory() != null) {
             CategoryDto categoryDto = new CategoryDto();
@@ -165,6 +166,7 @@ public class EventMapper {
         dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
         dto.setViews(event.getViews() != null ? event.getViews() : 0L);
         dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
+        dto.setLocation(event.getLocation());
 
         if (event.getCategory() != null) {
             CategoryDto categoryDto = new CategoryDto();
