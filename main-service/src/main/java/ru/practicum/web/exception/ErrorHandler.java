@@ -4,24 +4,30 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.coyote.BadRequestException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
-@RestControllerAdvice
 @Slf4j
+@RestControllerAdvice
 public class ErrorHandler {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ApiError notFoundHandler(NotFoundException e) {
-        log.error("NotFoundException: {}", e.getMessage());
+    public ApiError handleNotFoundException(NotFoundException e) {
+        log.error("404 Not Found: {}", e.getMessage());
         return ApiError.builder()
                 .status(HttpStatus.NOT_FOUND.name())
                 .reason("The required object was not found.")
@@ -33,15 +39,11 @@ public class ErrorHandler {
 
     @ExceptionHandler(ConflictException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiError conflictHandler(ConflictException e) {
-        log.error("ConflictException: {}", e.getMessage());
-        String reason = e.getMessage().contains("constraint")
-                ? "Integrity constraint has been violated."
-                : "For the requested operation the conditions are not met.";
-
+    public ApiError handleConflictException(ConflictException e) {
+        log.error("409 Conflict: {}", e.getMessage());
         return ApiError.builder()
                 .status(HttpStatus.CONFLICT.name())
-                .reason(reason)
+                .reason("For the requested operation the conditions are not met.")
                 .message(e.getMessage())
                 .timestamp(LocalDateTime.now().format(FORMATTER))
                 .errors(Collections.emptyList())
@@ -50,8 +52,8 @@ public class ErrorHandler {
 
     @ExceptionHandler(BadRequestException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError badRequestHandler(BadRequestException e) {
-        log.error("BadRequestException: {}", e.getMessage());
+    public ApiError handleBadRequestException(BadRequestException e) {
+        log.error("400 Bad Request: {}", e.getMessage());
         return ApiError.builder()
                 .status(HttpStatus.BAD_REQUEST.name())
                 .reason("Incorrectly made request.")
@@ -63,8 +65,8 @@ public class ErrorHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError illegalArgumentHandler(IllegalArgumentException e) {
-        log.error("IllegalArgumentException: {}", e.getMessage());
+    public ApiError handleIllegalArgumentException(IllegalArgumentException e) {
+        log.error("400 Bad Request: {}", e.getMessage());
         return ApiError.builder()
                 .status(HttpStatus.BAD_REQUEST.name())
                 .reason("Incorrectly made request.")
@@ -76,14 +78,17 @@ public class ErrorHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiError handleValidationExceptions(MethodArgumentNotValidException e) {  // Измените имя метода
-        log.error("MethodArgumentNotValidException: {}", e.getMessage());
-        String message = "Validation error";
-        if (e.getBindingResult().getFieldError() != null) {
-            message = "Field: " + e.getBindingResult().getFieldError().getField() +
-                    ". Error: " + e.getBindingResult().getFieldError().getDefaultMessage() +
-                    ". Value: " + e.getBindingResult().getFieldError().getRejectedValue();
-        }
+    public ApiError handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        log.error("400 Bad Request - Validation error: {}", e.getMessage());
+
+        Map<String, String> errors = new HashMap<>();
+        e.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            errors.put(fieldName, errorMessage);
+        });
+
+        String message = "Validation error: " + errors.toString();
 
         return ApiError.builder()
                 .status(HttpStatus.BAD_REQUEST.name())
@@ -94,25 +99,58 @@ public class ErrorHandler {
                 .build();
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleMissingServletRequestParameterException(MissingServletRequestParameterException e) {
+        log.error("400 Bad Request - Missing parameter: {}", e.getMessage());
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST.name())
+                .reason("Incorrectly made request.")
+                .message(String.format("Missing required parameter: %s", e.getParameterName()))
+                .timestamp(LocalDateTime.now().format(FORMATTER))
+                .errors(Collections.emptyList())
+                .build();
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
+        log.error("400 Bad Request - Type mismatch: {}", e.getMessage());
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST.name())
+                .reason("Incorrectly made request.")
+                .message(String.format("Invalid value for parameter '%s': %s", e.getName(), e.getValue()))
+                .timestamp(LocalDateTime.now().format(FORMATTER))
+                .errors(Collections.emptyList())
+                .build();
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+        log.error("400 Bad Request - Message not readable: {}", e.getMessage());
+        return ApiError.builder()
+                .status(HttpStatus.BAD_REQUEST.name())
+                .reason("Incorrectly made request.")
+                .message("Required request body is missing or invalid")
+                .timestamp(LocalDateTime.now().format(FORMATTER))
+                .errors(Collections.emptyList())
+                .build();
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
-    public ApiError dataIntegrityHandler(DataIntegrityViolationException e) {
-        log.error("DataIntegrityViolationException: {}", e.getMessage());
+    public ApiError handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        log.error("409 Conflict - Data integrity violation: {}", e.getMessage());
         String message = e.getMostSpecificCause().getMessage();
         String reason = "Integrity constraint has been violated.";
 
-        if (message.contains("uq_category_name")) {
-            message = "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                    "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement";
-        } else if (message.contains("uq_email")) {
-            message = "could not execute statement; SQL [n/a]; constraint [uq_email]; " +
-                    "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement";
-        } else if (message.contains("uq_compilation_name")) {
-            message = "could not execute statement; SQL [n/a]; constraint [uq_compilation_name]; " +
-                    "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement";
+        if (message.contains("users_email_key") || message.contains("uq_email")) {
+            message = "User with this email already exists";
+        } else if (message.contains("categories_name_key") || message.contains("uq_category_name")) {
+            message = "Category with this name already exists";
         } else if (message.contains("uq_request")) {
-            message = "could not execute statement; SQL [n/a]; constraint [uq_request]; " +
-                    "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement";
+            message = "Request already exists";
         }
 
         return ApiError.builder()
@@ -126,8 +164,8 @@ public class ErrorHandler {
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ApiError genericHandler(Exception e) {
-        log.error("Internal server error: {}", e.getMessage(), e);
+    public ApiError handleException(Exception e) {
+        log.error("500 Internal Server Error: {}", e.getMessage(), e);
         return ApiError.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.name())
                 .reason("Internal server error.")

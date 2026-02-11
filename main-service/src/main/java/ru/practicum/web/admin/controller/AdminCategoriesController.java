@@ -27,13 +27,11 @@ public class AdminCategoriesController {
     @PatchMapping("/{catId}")
     public ResponseEntity<CategoryDto> update(
             @PathVariable Long catId,
-            @RequestBody @Valid CategoryDto dto
+            @RequestBody @Valid NewCategoryDto dto
     ) {
-        if (dto.getName() != null && (dto.getName().isEmpty() || dto.getName().length() > 50)) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        CategoryDto updated = service.update(catId, dto);
+        CategoryDto categoryDto = new CategoryDto();
+        categoryDto.setName(dto.getName());
+        CategoryDto updated = service.update(catId, categoryDto);
         return ResponseEntity.ok(updated);
     }
 

@@ -13,6 +13,7 @@ import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 
@@ -20,6 +21,7 @@ import jakarta.transaction.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
@@ -41,12 +43,27 @@ public class AdminEventServiceImpl implements AdminEventService {
                                     int from,
                                     int size) {
 
+        if (from < 0) {
+            throw new BadRequestException("Parameter 'from' must be non-negative");
+        }
+        if (size <= 0) {
+            throw new BadRequestException("Parameter 'size' must be positive");
+        }
+
         Pageable pageable = PageRequest.of(from / size, size);
         LocalDateTime start = parseDateTime(rangeStart);
         LocalDateTime end = parseDateTime(rangeEnd);
 
-        List<Event.Status> statusEnums = (states == null || states.isEmpty()) ? null :
-                states.stream().map(Event.Status::valueOf).toList();
+        List<Event.Status> statusEnums = null;
+        if (states != null && !states.isEmpty()) {
+            try {
+                statusEnums = states.stream()
+                        .map(Event.Status::valueOf)
+                        .toList();
+            } catch (IllegalArgumentException e) {
+                throw new BadRequestException("Invalid state value: " + states);
+            }
+        }
 
         Page<Event> eventPage = eventRepository.findEventsByAdminFilters(
                 (users == null || users.isEmpty()) ? null : users,
@@ -59,7 +76,10 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         List<Event> events = eventPage.getContent();
 
-        events.forEach(event -> event.setViews(getViews(event)));
+        events.forEach(event -> {
+            Long views = getViews(event);
+            event.setViews(views != null ? views : 0L);
+        });
 
         return events.stream()
                 .map(EventMapper::toDto)
@@ -71,16 +91,50 @@ public class AdminEventServiceImpl implements AdminEventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        Event tempEvent = new Event();
-        if (updateRequest.getTitle() != null) tempEvent.setTitle(updateRequest.getTitle());
-        if (updateRequest.getAnnotation() != null) tempEvent.setAnnotation(updateRequest.getAnnotation());
-        if (updateRequest.getDescription() != null) tempEvent.setDescription(updateRequest.getDescription());
-        if (updateRequest.getEventDate() != null) tempEvent.setEventDate(parseDateTime(updateRequest.getEventDate()));
-        if (updateRequest.getPaid() != null) tempEvent.setPaid(updateRequest.getPaid());
-        if (updateRequest.getParticipantLimit() != null) tempEvent.setParticipantLimit(updateRequest.getParticipantLimit());
-        if (updateRequest.getRequestModeration() != null) tempEvent.setRequestModeration(updateRequest.getRequestModeration());
+        // Валидация полей
+        if (updateRequest.getTitle() != null) {
+            if (updateRequest.getTitle().length() < 3 || updateRequest.getTitle().length() > 120) {
+                throw new BadRequestException("Title length must be between 3 and 120 characters");
+            }
+            event.setTitle(updateRequest.getTitle());
+        }
 
-        EventMapper.updateEntityFromDto(event, EventMapper.toDto(tempEvent));
+        if (updateRequest.getAnnotation() != null) {
+            if (updateRequest.getAnnotation().length() < 20 || updateRequest.getAnnotation().length() > 2000) {
+                throw new BadRequestException("Annotation length must be between 20 and 2000 characters");
+            }
+            event.setAnnotation(updateRequest.getAnnotation());
+        }
+
+        if (updateRequest.getDescription() != null) {
+            if (updateRequest.getDescription().length() < 20 || updateRequest.getDescription().length() > 7000) {
+                throw new BadRequestException("Description length must be between 20 and 7000 characters");
+            }
+            event.setDescription(updateRequest.getDescription());
+        }
+
+        if (updateRequest.getEventDate() != null) {
+            LocalDateTime eventDate = parseDateTime(updateRequest.getEventDate());
+            if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
+                throw new ConflictException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
+            }
+            event.setEventDate(eventDate);
+        }
+
+        if (updateRequest.getPaid() != null) {
+            event.setPaid(updateRequest.getPaid());
+        }
+
+        if (updateRequest.getParticipantLimit() != null) {
+            if (updateRequest.getParticipantLimit() < 0) {
+                throw new BadRequestException("Participant limit must be non-negative");
+            }
+            event.setParticipantLimit(updateRequest.getParticipantLimit());
+        }
+
+        if (updateRequest.getRequestModeration() != null) {
+            event.setRequestModeration(updateRequest.getRequestModeration());
+        }
 
         if (updateRequest.getCategory() != null) {
             event.setCategory(categoryRepository.findById(updateRequest.getCategory())
@@ -90,61 +144,60 @@ public class AdminEventServiceImpl implements AdminEventService {
         if (updateRequest.getStateAction() != null) {
             switch (updateRequest.getStateAction().toUpperCase()) {
                 case "PUBLISH_EVENT" -> {
-                    if (event.getStatus() != Event.Status.PENDING)
+                    if (event.getStatus() != Event.Status.PENDING) {
                         throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getStatus());
-                    if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(1)))
+                    }
+                    if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(1))) {
                         throw new ConflictException("Cannot publish event because event date is too soon");
+                    }
                     event.setStatus(Event.Status.PUBLISHED);
                     event.setPublishedOn(LocalDateTime.now());
                 }
                 case "REJECT_EVENT" -> {
-                    if (event.getStatus() == Event.Status.PUBLISHED)
+                    if (event.getStatus() == Event.Status.PUBLISHED) {
                         throw new ConflictException("Cannot reject already published event");
+                    }
                     event.setStatus(Event.Status.CANCELED);
                 }
                 default ->
-                        throw new IllegalArgumentException("Invalid state action: " + updateRequest.getStateAction());
+                        throw new BadRequestException("Invalid state action: " + updateRequest.getStateAction());
             }
         }
 
-        event.setViews(getViews(event));
-        return EventMapper.toDto(eventRepository.save(event));
+        Event savedEvent = eventRepository.save(event);
+        Long views = getViews(savedEvent);
+        savedEvent.setViews(views != null ? views : 0L);
+
+        return EventMapper.toDto(savedEvent);
     }
 
     private LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.isBlank()) return null;
+        if (dateTimeStr == null || dateTimeStr.isBlank()) {
+            return null;
+        }
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             try {
                 return LocalDateTime.parse(dateTimeStr);
-            } catch (Exception e2) {
-                throw new IllegalArgumentException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss or ISO format");
+            } catch (DateTimeParseException e2) {
+                throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss or ISO format");
             }
         }
     }
 
     private Long getViews(Event event) {
-        if (statsClient == null || event.getId() == null) return 0L;
+        if (statsClient == null || event.getId() == null) {
+            return 0L;
+        }
         try {
-            LocalDateTime start = event.getCreatedOn() != null ? event.getCreatedOn() : LocalDateTime.now().minusYears(1);
+            LocalDateTime start = event.getCreatedOn() != null ?
+                    event.getCreatedOn() : LocalDateTime.now().minusYears(1);
             String uri = "/events/" + event.getId();
             List<ViewStatsDto> stats = statsClient.getStats(start, LocalDateTime.now(), List.of(uri), true);
             return stats.isEmpty() ? 0L : stats.getFirst().getHits();
         } catch (Exception e) {
             return 0L;
         }
-    }
-
-    private EventDto updateRequestToEventDto(UpdateEventAdminRequest req) {
-        EventDto dto = new EventDto();
-        dto.setTitle(req.getTitle());
-        dto.setAnnotation(req.getAnnotation());
-        dto.setDescription(req.getDescription());
-        dto.setEventDate(req.getEventDate());
-        dto.setPaid(req.getPaid());
-        dto.setParticipantLimit(req.getParticipantLimit());
-        dto.setRequestModeration(req.getRequestModeration());
-        return dto;
     }
 }

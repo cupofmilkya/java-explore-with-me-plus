@@ -20,42 +20,53 @@ public class Event {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String title;
+
+    @Column(nullable = false, length = 2000)
     private String annotation;
+
+    @Column(nullable = false, length = 7000)
     private String description;
 
-    @Column(name = "event_date")
+    @Column(name = "event_date", nullable = false)
     private LocalDateTime eventDate;
 
-    @ManyToOne
-    @JoinColumn(name = "initiator_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "initiator_id", nullable = false)
     private User initiator;
 
-    @ManyToOne
-    @JoinColumn(name = "category_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @Embedded
+    private Location location;
+
+    @Column(nullable = false)
     private Boolean paid;
 
+    @Column(name = "participant_limit", nullable = false)
     private Integer participantLimit;
 
-    @Column(name = "request_moderation")
+    @Column(name = "request_moderation", nullable = false)
     private Boolean requestModeration;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private Status status;
 
-    @Column(name = "created_on")
+    @Column(name = "created_on", nullable = false)
     private LocalDateTime createdOn;
 
     @Column(name = "published_on")
     private LocalDateTime publishedOn;
 
+    @Column(name = "confirmed_requests", nullable = false)
+    private Integer confirmedRequests = 0;
+
     @Transient
     private Long views = 0L;
-
-    @Column(name = "confirmed_requests")
-    private Long confirmedRequests = 0L;
 
     public enum Status {
         PENDING, PUBLISHED, CANCELED

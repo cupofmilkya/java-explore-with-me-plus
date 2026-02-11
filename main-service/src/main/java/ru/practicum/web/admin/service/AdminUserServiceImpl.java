@@ -1,12 +1,12 @@
 package ru.practicum.web.admin.service;
 
-import jakarta.annotation.Nullable;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.user.dto.NewUserRequest;
@@ -27,18 +27,25 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public UserDto create(NewUserRequest request) {
-        if (request.getEmail() == null || request.getEmail().isBlank() ||
-                request.getEmail().length() < 6 || request.getEmail().length() > 254) {
-            throw new IllegalArgumentException("Email length must be between 6 and 254 characters");
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new BadRequestException("Email must not be blank");
+        }
+        if (request.getEmail().length() < 6 || request.getEmail().length() > 254) {
+            throw new BadRequestException("Email length must be between 6 and 254 characters");
+        }
+        if (!request.getEmail().contains("@")) {
+            throw new BadRequestException("Invalid email format");
         }
 
-        if (request.getName() == null || request.getName().isBlank() ||
-                request.getName().length() < 2 || request.getName().length() > 250) {
-            throw new IllegalArgumentException("Name length must be between 2 and 250 characters");
+        if (request.getName() == null || request.getName().isBlank()) {
+            throw new BadRequestException("Name must not be blank");
+        }
+        if (request.getName().length() < 2 || request.getName().length() > 250) {
+            throw new BadRequestException("Name length must be between 2 and 250 characters");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("Email уже существует");
+            throw new ConflictException("User with email " + request.getEmail() + " already exists");
         }
 
         try {
@@ -48,27 +55,20 @@ public class AdminUserServiceImpl implements AdminUserService {
                     .build();
             return UserMapper.toDto(userRepository.save(user));
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException("Email уже существует");
+            throw new ConflictException("User with email " + request.getEmail() + " already exists");
         }
     }
 
     @Override
     public void delete(Long userId) {
         if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("Пользователь с id=" + userId + " не найден");
+            throw new NotFoundException("User with id=" + userId + " was not found");
         }
         userRepository.deleteById(userId);
     }
 
     @Override
-    public List<UserDto> getUsers(@Nullable List<Long> ids, int from, int size) {
-        if (size <= 0) {
-            throw new IllegalArgumentException("Размер страницы должен быть больше 0");
-        }
-        if (from < 0) {
-            throw new IllegalArgumentException("Параметр from должен быть неотрицательным");
-        }
-
+    public List<UserDto> getUsers(List<Long> ids, int from, int size) {
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
@@ -79,8 +79,9 @@ public class AdminUserServiceImpl implements AdminUserService {
                     .collect(Collectors.toList());
         } else {
             return userRepository.findAll(pageable)
+                    .stream()
                     .map(UserMapper::toDto)
-                    .getContent();
+                    .collect(Collectors.toList());
         }
     }
 }

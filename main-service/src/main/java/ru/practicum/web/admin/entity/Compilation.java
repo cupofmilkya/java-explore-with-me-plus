@@ -2,6 +2,7 @@ package ru.practicum.web.admin.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ru.practicum.web.event.entity.Event;
 
 import java.util.List;
 
@@ -18,13 +19,17 @@ public class Compilation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String title;
 
-    private boolean pinned;
+    @Column(nullable = false)
+    private Boolean pinned;
 
-    @ElementCollection
-    @CollectionTable(name = "compilation_events", joinColumns = @JoinColumn(name = "compilation_id"))
-    @Column(name = "event_id")
-    private List<Long> events;
+    @ManyToMany
+    @JoinTable(
+            name = "compilation_events",
+            joinColumns = @JoinColumn(name = "compilation_id"),
+            inverseJoinColumns = @JoinColumn(name = "event_id")
+    )
+    private List<Event> events;
 }

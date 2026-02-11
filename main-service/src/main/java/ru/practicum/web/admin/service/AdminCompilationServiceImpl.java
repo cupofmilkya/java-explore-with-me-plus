@@ -5,14 +5,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.admin.dto.CompilationDto;
 import ru.practicum.web.admin.dto.NewCompilationDto;
-import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 import ru.practicum.web.admin.entity.Compilation;
-import ru.practicum.web.admin.mapper.CompilationMapper;
+import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 import ru.practicum.web.admin.repository.CompilationRepository;
-import ru.practicum.web.exception.NotFoundException;
+import ru.practicum.web.event.dto.EventShortDto;
+import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.exception.BadRequestException;
+import ru.practicum.web.exception.NotFoundException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,10 +28,12 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
     private final EventRepository eventRepository;
 
     @Override
-    @Transactional
     public CompilationDto create(NewCompilationDto dto) {
-        if (dto.getTitle() == null || dto.getTitle().isBlank() || dto.getTitle().length() > 50) {
-            throw new IllegalArgumentException("Title length must be between 1 and 50 characters");
+        if (dto.getTitle() == null || dto.getTitle().isBlank()) {
+            throw new BadRequestException("Title must not be blank");
+        }
+        if (dto.getTitle().length() < 1 || dto.getTitle().length() > 50) {
+            throw new BadRequestException("Title length must be between 1 and 50 characters");
         }
 
         Compilation compilation = new Compilation();
@@ -34,29 +41,32 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
 
         if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
+            List<Event> events = new ArrayList<>();
             for (Long eventId : dto.getEvents()) {
-                if (!eventRepository.existsById(eventId)) {
-                    throw new NotFoundException("Event with id=" + eventId + " was not found");
-                }
+                Event event = eventRepository.findById(eventId)
+                        .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+                events.add(event);
             }
-            compilation.setEvents(dto.getEvents());
+            compilation.setEvents(events);
         } else {
-            compilation.setEvents(List.of());
+            compilation.setEvents(new ArrayList<>());
         }
 
         Compilation saved = compilationRepository.save(compilation);
-        return CompilationMapper.toDto(saved);
+        return toDto(saved);
     }
 
     @Override
-    @Transactional
     public CompilationDto update(Long id, UpdateCompilationRequest dto) {
         Compilation compilation = compilationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Compilation with id=" + id + " was not found"));
 
         if (dto.getTitle() != null) {
-            if (dto.getTitle().isBlank() || dto.getTitle().length() > 50) {
-                throw new IllegalArgumentException("Title length must be between 1 and 50 characters");
+            if (dto.getTitle().isBlank()) {
+                throw new BadRequestException("Title must not be blank");
+            }
+            if (dto.getTitle().length() < 1 || dto.getTitle().length() > 50) {
+                throw new BadRequestException("Title length must be between 1 and 50 characters");
             }
             compilation.setTitle(dto.getTitle());
         }
@@ -66,26 +76,39 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         }
 
         if (dto.getEvents() != null) {
-            if (!dto.getEvents().isEmpty()) {
-                for (Long eventId : dto.getEvents()) {
-                    if (!eventRepository.existsById(eventId)) {
-                        throw new NotFoundException("Event with id=" + eventId + " was not found");
-                    }
-                }
+            List<Event> events = new ArrayList<>();
+            for (Long eventId : dto.getEvents()) {
+                Event event = eventRepository.findById(eventId)
+                        .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+                events.add(event);
             }
-            compilation.setEvents(dto.getEvents());
+            compilation.setEvents(events);
         }
 
         Compilation updated = compilationRepository.save(compilation);
-        return CompilationMapper.toDto(updated);
+        return toDto(updated);
     }
 
     @Override
-    @Transactional
     public void delete(Long id) {
         if (!compilationRepository.existsById(id)) {
             throw new NotFoundException("Compilation with id=" + id + " was not found");
         }
         compilationRepository.deleteById(id);
+    }
+
+    private CompilationDto toDto(Compilation compilation) {
+        List<EventShortDto> eventDtos = compilation.getEvents() != null ?
+                compilation.getEvents().stream()
+                        .map(EventMapper::toShortDto)
+                        .collect(Collectors.toList()) :
+                new ArrayList<>();
+
+        return CompilationDto.builder()
+                .id(compilation.getId())
+                .title(compilation.getTitle())
+                .pinned(compilation.getPinned())
+                .events(eventDtos)
+                .build();
     }
 }

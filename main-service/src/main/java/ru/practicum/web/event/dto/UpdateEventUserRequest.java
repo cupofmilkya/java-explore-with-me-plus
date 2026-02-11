@@ -2,6 +2,7 @@ package ru.practicum.web.event.dto;
 
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import ru.practicum.web.event.entity.Location;
 
 @Data
 public class UpdateEventUserRequest {
