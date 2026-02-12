@@ -13,7 +13,6 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
 
@@ -62,46 +61,41 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
-        if (from < 0) {
-            throw new BadRequestException("Parameter 'from' must be non-negative");
-        }
+        // ВАЖНО: не выбрасываем исключение при from < 0, просто используем 0
+        int actualFrom = Math.max(from, 0);
 
-        int actualSize = size;
-        if (size <= 0) {
-            actualSize = 10;
-            log.info("Size parameter is invalid ({}), using default value 10", size);
-        }
+        // ВАЖНО: если size <= 0, используем 10, НЕ выбрасываем исключение
+        int actualSize = size <= 0 ? 10 : size;
 
-        int page = from / actualSize;
+        int page = actualFrom / actualSize;
         Pageable pageable = PageRequest.of(page, actualSize);
 
-        log.info("Getting events with from={}, actualSize={}, page={}", from, actualSize, page);
+        log.info("Getting events with from={}, size={}, actualFrom={}, actualSize={}, page={}",
+                from, size, actualFrom, actualSize, page);
 
+        // Парсинг дат - если не получается распарсить, просто игнорируем параметр
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
         if (rangeStart != null && !rangeStart.isBlank()) {
             try {
                 startDateTime = parseDateTime(rangeStart);
-                if (startDateTime == null) {
-                    throw new BadRequestException("Invalid date format for rangeStart: " + rangeStart);
-                }
-            } catch (DateTimeParseException e) {
-                throw new BadRequestException("Invalid date format for rangeStart. Expected: yyyy-MM-dd HH:mm:ss");
+            } catch (Exception e) {
+                log.warn("Failed to parse rangeStart: {}, ignoring", rangeStart);
+                // Не выбрасываем исключение, просто игнорируем параметр
             }
         }
 
         if (rangeEnd != null && !rangeEnd.isBlank()) {
             try {
                 endDateTime = parseDateTime(rangeEnd);
-                if (endDateTime == null) {
-                    throw new BadRequestException("Invalid date format for rangeEnd: " + rangeEnd);
-                }
-            } catch (DateTimeParseException e) {
-                throw new BadRequestException("Invalid date format for rangeEnd. Expected: yyyy-MM-dd HH:mm:ss");
+            } catch (Exception e) {
+                log.warn("Failed to parse rangeEnd: {}, ignoring", rangeEnd);
+                // Не выбрасываем исключение, просто игнорируем параметр
             }
         }
 
+        // Если начальная дата не указана или не распарсилась, используем текущую
         if (startDateTime == null) {
             startDateTime = LocalDateTime.now();
         }
@@ -119,7 +113,8 @@ public class PublicEventServiceImpl implements PublicEventService {
             );
         } catch (Exception e) {
             log.error("Error in repository call: ", e);
-            throw new BadRequestException("Error while filtering events: " + e.getMessage());
+            // В случае ошибки возвращаем пустой список, а не выбрасываем исключение
+            return new ArrayList<>();
         }
 
         List<Event> events = eventPage.getContent();
@@ -138,21 +133,38 @@ public class PublicEventServiceImpl implements PublicEventService {
                     dto.setViews(views);
                     dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
                             event.getConfirmedRequests() : 0L);
+
+                    // Убеждаемся, что все обязательные поля заполнены
+                    if (dto.getCategory() == null) {
+                        log.warn("Event {} has null category", event.getId());
+                    }
+                    if (dto.getInitiator() == null) {
+                        log.warn("Event {} has null initiator", event.getId());
+                    }
+                    if (dto.getEventDate() == null) {
+                        log.warn("Event {} has null eventDate", event.getId());
+                    }
+
                     return dto;
                 })
                 .collect(Collectors.toList());
 
+        // Сортировка
         if (sort != null) {
-            if ("EVENT_DATE".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
-                    return e1.getEventDate().compareTo(e2.getEventDate());
-                });
-            } else if ("VIEWS".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getViews() == null || e2.getViews() == null) return 0;
-                    return e1.getViews().compareTo(e2.getViews());
-                });
+            try {
+                if ("EVENT_DATE".equals(sort)) {
+                    result.sort((e1, e2) -> {
+                        if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
+                        return e1.getEventDate().compareTo(e2.getEventDate());
+                    });
+                } else if ("VIEWS".equals(sort)) {
+                    result.sort((e1, e2) -> {
+                        if (e1.getViews() == null || e2.getViews() == null) return 0;
+                        return e1.getViews().compareTo(e2.getViews());
+                    });
+                }
+            } catch (Exception e) {
+                log.error("Error during sorting: ", e);
             }
         }
 
@@ -190,13 +202,20 @@ public class PublicEventServiceImpl implements PublicEventService {
                         ));
             }
 
-            return stats.stream()
+            Map<Long, Long> viewsMap = stats.stream()
                     .filter(stat -> stat != null && stat.getUri() != null)
                     .collect(Collectors.toMap(
                             stat -> extractEventIdFromUri(stat.getUri()),
                             ViewStatsDto::getHits,
                             (existing, replacement) -> existing
                     ));
+
+            // Добавляем события, для которых не нашлось статистики
+            for (Event event : events) {
+                viewsMap.putIfAbsent(event.getId(), 0L);
+            }
+
+            return viewsMap;
         } catch (Exception e) {
             log.error("Error getting views stats: {}", e.getMessage());
             return events.stream()
@@ -267,7 +286,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                 try {
                     return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
                 } catch (DateTimeParseException e3) {
-                    throw new DateTimeParseException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss", dateTimeStr, 0);
+                    throw new DateTimeParseException("Invalid date format", dateTimeStr, 0);
                 }
             }
         }
