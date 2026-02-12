@@ -44,6 +44,7 @@ public class PublicEventController {
                 text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size
         );
+        sendHit(request);
         return ResponseEntity.ok(events);
     }
 
@@ -52,24 +53,24 @@ public class PublicEventController {
                                              HttpServletRequest request) {
         log.info("GET /events/{}", id);
 
-        try {
-            hitStats(request);
-        } catch (Exception e) {
-            log.error("Failed to send stats, but continuing: {}", e.getMessage());
-        }
+        sendHit(request);
 
         EventDto event = publicEventService.getEvent(id);
         return ResponseEntity.ok(event);
     }
 
-    private void hitStats(HttpServletRequest request) {
-        statsClient.hit(
-                EndpointHitDto.builder()
-                        .app("ewm-main-service")
-                        .uri(request.getRequestURI())
-                        .ip(request.getRemoteAddr())
-                        .timestamp(LocalDateTime.now())
-                        .build()
-        );
+    private void sendHit(HttpServletRequest request) {
+        try {
+            statsClient.hit(
+                    EndpointHitDto.builder()
+                            .app("ewm-main-service")
+                            .uri(request.getRequestURI())
+                            .ip(request.getRemoteAddr())
+                            .timestamp(LocalDateTime.now())
+                            .build()
+            );
+        } catch (Exception e) {
+            log.error("Error sending stats: {}", e.getMessage());
+        }
     }
 }
