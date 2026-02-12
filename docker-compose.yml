@@ -1,14 +1,35 @@
 services:
+  main-db:
+    image: postgres:16.1
+    container_name: ewm-main-db
+    environment:
+      POSTGRES_DB: ewm_main
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - main-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   stats-db:
     image: postgres:16.1
+    container_name: ewm-stats-db
     environment:
       POSTGRES_DB: stats
       POSTGRES_USER: stats
       POSTGRES_PASSWORD: stats
+    ports:
+      - "5433:5432"
+    volumes:
+      - stats-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U stats"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
 
@@ -16,33 +37,44 @@ services:
     build:
       context: .
       dockerfile: stats/stats-server/Dockerfile
-    container_name: stats-server-container
+    container_name: stats-server
     ports:
       - "9090:9090"
-      - "8080:8080"
-    depends_on:
-      stats-db:
-        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
       SPRING_DATASOURCE_USERNAME: stats
       SPRING_DATASOURCE_PASSWORD: stats
+      SERVER_PORT: 9090
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      stats-db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:9090/actuator/health | grep UP || exit 1" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   ewm-service:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: main-service/Dockerfile
     container_name: ewm-service
     ports:
-      - "9091:9090"
-    depends_on:
-      - stats-server
+      - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://stats-db:5432/stats
-      SPRING_DATASOURCE_USERNAME: stats
-      SPRING_DATASOURCE_PASSWORD: stats
+      SPRING_DATASOURCE_URL: jdbc:postgresql://main-db:5432/ewm_main
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      STATS_SERVER_URL: http://stats-server:9090
+      SERVER_PORT: 8080
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      main-db:
+        condition: service_healthy
+      stats-server:
+        condition: service_healthy
+
+volumes:
+  main-db-data:
+  stats-db-data:

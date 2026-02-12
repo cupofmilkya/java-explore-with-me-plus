@@ -1,15 +1,14 @@
-FROM maven:3.9.9-eclipse-temurin-21 AS build
-WORKDIR /build
-
-COPY pom.xml .
-COPY stats ./stats
-COPY main-service ./main-service
-
-RUN mvn -B -q clean package -DskipTests
-
-FROM eclipse-temurin:21-jre
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
-COPY --from=build /build/stats/stats-server/target/*.jar app.jar
 
-EXPOSE 9090
+COPY . .
+
+RUN mvn clean package -DskipTests -pl main-service -am
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /app/main-service/target/main-service-*.jar app.jar
+
+EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

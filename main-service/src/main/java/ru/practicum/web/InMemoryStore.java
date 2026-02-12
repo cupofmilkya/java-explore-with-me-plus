@@ -2,8 +2,8 @@ package ru.practicum.web;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
-import ru.practicum.web.dto.EventDto;
-import ru.practicum.web.dto.UserDto;
+import ru.practicum.web.event.dto.EventDto;
+import ru.practicum.web.user.dto.UserDto;
 
 import java.util.ArrayList;
 import java.util.Collections;
