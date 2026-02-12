@@ -81,46 +81,22 @@ public class PublicEventServiceImpl implements PublicEventService {
         LocalDateTime endDateTime = null;
 
         if (rangeStart != null && !rangeStart.isBlank()) {
-            try {
-                startDateTime = parseDateTime(rangeStart);
-                if (startDateTime == null) {
-                    throw new BadRequestException("Invalid date format for rangeStart: " + rangeStart);
-                }
-            } catch (DateTimeParseException e) {
-                throw new BadRequestException("Invalid date format for rangeStart. Expected: yyyy-MM-dd HH:mm:ss");
-            }
+            startDateTime = parseDateTime(rangeStart);
         }
 
         if (rangeEnd != null && !rangeEnd.isBlank()) {
-            try {
-                endDateTime = parseDateTime(rangeEnd);
-                if (endDateTime == null) {
-                    throw new BadRequestException("Invalid date format for rangeEnd: " + rangeEnd);
-                }
-            } catch (DateTimeParseException e) {
-                throw new BadRequestException("Invalid date format for rangeEnd. Expected: yyyy-MM-dd HH:mm:ss");
-            }
+            endDateTime = parseDateTime(rangeEnd);
         }
 
-        if (startDateTime == null) {
-            startDateTime = LocalDateTime.now();
-        }
-
-        Page<Event> eventPage;
-        try {
-            eventPage = eventRepository.findPublicEventsWithFilters(
-                    text,
-                    categories != null && !categories.isEmpty() ? categories : null,
-                    paid,
-                    startDateTime,
-                    endDateTime,
-                    onlyAvailable != null ? onlyAvailable : false,
-                    pageable
-            );
-        } catch (Exception e) {
-            log.error("Error in repository call: ", e);
-            throw new BadRequestException("Error while filtering events: " + e.getMessage());
-        }
+        Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
+                text,
+                categories != null && !categories.isEmpty() ? categories : null,
+                paid,
+                startDateTime,
+                endDateTime,
+                onlyAvailable != null ? onlyAvailable : false,
+                pageable
+        );
 
         List<Event> events = eventPage.getContent();
         log.info("Found {} events", events.size());
@@ -252,24 +228,10 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
-            return null;
-        }
-
-        dateTimeStr = dateTimeStr.trim();
-
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (DateTimeParseException e) {
-            try {
-                return LocalDateTime.parse(dateTimeStr);
-            } catch (DateTimeParseException e2) {
-                try {
-                    return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
-                } catch (DateTimeParseException e3) {
-                    throw new DateTimeParseException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss", dateTimeStr, 0);
-                }
-            }
+            throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
         }
     }
 }
