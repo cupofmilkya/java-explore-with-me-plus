@@ -13,6 +13,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
+import ru.practicum.web.event.repository.EventSpecification;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
@@ -66,11 +67,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
 
-        int actualSize = size;
-        if (size <= 0) {
-            actualSize = 10;
-            log.info("Size parameter is invalid ({}), using default value 10", size);
-        }
+        int actualSize = size > 0 ? size : 10;
 
         int page = from / actualSize;
         Pageable pageable = PageRequest.of(page, actualSize);
@@ -88,14 +85,21 @@ public class PublicEventServiceImpl implements PublicEventService {
             endDateTime = parseDateTime(rangeEnd);
         }
 
-        Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
-                Event.Status.PUBLISHED,
-                text,
-                categories != null && !categories.isEmpty() ? categories : null,
-                paid,
-                startDateTime,
-                endDateTime,
-                onlyAvailable != null ? onlyAvailable : false,
+        if (startDateTime != null && endDateTime != null &&
+                startDateTime.isAfter(endDateTime)) {
+            throw new BadRequestException("rangeStart must be before rangeEnd");
+        }
+
+        Page<Event> eventPage = eventRepository.findAll(
+                EventSpecification.publicEvents(
+                        Event.Status.PUBLISHED,
+                        text,
+                        categories,
+                        paid,
+                        startDateTime,
+                        endDateTime,
+                        onlyAvailable
+                ),
                 pageable
         );
 

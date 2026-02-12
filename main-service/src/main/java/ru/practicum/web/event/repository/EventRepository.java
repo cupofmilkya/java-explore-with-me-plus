@@ -11,13 +11,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface EventRepository extends JpaRepository<Event, Long> {
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+public interface EventRepository extends JpaRepository<Event, Long>,
+        JpaSpecificationExecutor<Event> {
+
+    Optional<Event> findByIdAndStatus(Long id, Event.Status status);
 
     Page<Event> findByInitiatorId(Long initiatorId, Pageable pageable);
 
     Optional<Event> findByIdAndInitiatorId(Long id, Long initiatorId);
-
-    Optional<Event> findByIdAndStatus(Long id, Event.Status status);
 
     boolean existsByCategoryId(Long categoryId);
 
@@ -35,22 +38,4 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("end") LocalDateTime end,
             Pageable pageable
     );
-
-    @Query("SELECT e FROM Event e WHERE " +
-            "e.status = :status AND " +
-            "(:text IS NULL OR LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) OR LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%'))) AND " +
-            "(:categories IS NULL OR e.category.id IN :categories) AND " +
-            "(:paid IS NULL OR e.paid = :paid) AND " +
-            "(:rangeStart IS NULL OR e.eventDate >= :rangeStart) AND " +
-            "(:rangeEnd IS NULL OR e.eventDate <= :rangeEnd) AND " +
-            "(:onlyAvailable = false OR (e.participantLimit = 0 OR e.confirmedRequests < e.participantLimit))")
-    Page<Event> findPublicEventsWithFilters(
-            @Param("status") Event.Status status,
-            @Param("text") String text,
-            @Param("categories") List<Long> categories,
-            @Param("paid") Boolean paid,
-            @Param("rangeStart") LocalDateTime rangeStart,
-            @Param("rangeEnd") LocalDateTime rangeEnd,
-            @Param("onlyAvailable") Boolean onlyAvailable,
-            Pageable pageable);
 }
