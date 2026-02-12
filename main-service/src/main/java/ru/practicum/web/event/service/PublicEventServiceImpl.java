@@ -89,6 +89,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         }
 
         Page<Event> eventPage = eventRepository.findPublicEventsWithFilters(
+                Event.Status.PUBLISHED,
                 text,
                 categories != null && !categories.isEmpty() ? categories : null,
                 paid,
@@ -136,23 +137,22 @@ public class PublicEventServiceImpl implements PublicEventService {
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
-        if (events.isEmpty()) {
+        if (events == null || events.isEmpty()) {
             return Map.of();
         }
 
         List<String> uris = events.stream()
+                .filter(e -> e.getId() != null)
                 .map(e -> "/events/" + e.getId())
                 .collect(Collectors.toList());
 
-        LocalDateTime start = events.stream()
-                .map(Event::getCreatedOn)
-                .filter(Objects::nonNull)
-                .min(LocalDateTime::compareTo)
-                .orElse(LocalDateTime.now().minusYears(1));
+        if (uris.isEmpty()) {
+            return Map.of();
+        }
 
         try {
             List<ViewStatsDto> stats = statsClient.getStats(
-                    start,
+                    LocalDateTime.now().minusYears(1),
                     LocalDateTime.now(),
                     uris,
                     true
@@ -160,22 +160,30 @@ public class PublicEventServiceImpl implements PublicEventService {
 
             if (stats == null || stats.isEmpty()) {
                 return events.stream()
+                        .filter(e -> e.getId() != null)
                         .collect(Collectors.toMap(
                                 Event::getId,
-                                ee -> 0L
+                                e -> 0L
                         ));
             }
 
             return stats.stream()
                     .filter(stat -> stat != null && stat.getUri() != null)
+                    .map(stat -> {
+                        Long id = extractEventIdFromUri(stat.getUri());
+                        return id != null ? Map.entry(id, stat.getHits()) : null;
+                    })
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toMap(
-                            stat -> extractEventIdFromUri(stat.getUri()),
-                            ViewStatsDto::getHits,
-                            (existing, replacement) -> existing
+                            Map.Entry::getKey,
+                            Map.Entry::getValue,
+                            (a, b) -> a
                     ));
+
         } catch (Exception e) {
-            log.error("Error getting views stats: {}", e.getMessage());
+            log.error("Error getting stats", e);
             return events.stream()
+                    .filter(ee -> ee.getId() != null)
                     .collect(Collectors.toMap(
                             Event::getId,
                             ee -> 0L
