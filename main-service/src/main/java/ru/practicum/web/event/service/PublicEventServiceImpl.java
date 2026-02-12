@@ -65,34 +65,41 @@ public class PublicEventServiceImpl implements PublicEventService {
         if (from < 0) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
+
+        int actualSize = size;
         if (size <= 0) {
-            throw new BadRequestException("Parameter 'size' must be positive");
+            actualSize = 10;
+            log.info("Size parameter is invalid ({}), using default value 10", size);
         }
 
-        int page = from / size;
-        Pageable pageable = PageRequest.of(page, size);
+        int page = from / actualSize;
+        Pageable pageable = PageRequest.of(page, actualSize);
 
-        log.info("Getting events with from={}, size={}, page={}", from, size, page);
+        log.info("Getting events with from={}, actualSize={}, page={}", from, actualSize, page);
 
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
-        try {
-            if (rangeStart != null && !rangeStart.isBlank()) {
+        if (rangeStart != null && !rangeStart.isBlank()) {
+            try {
                 startDateTime = parseDateTime(rangeStart);
+                if (startDateTime == null) {
+                    throw new BadRequestException("Invalid date format for rangeStart: " + rangeStart);
+                }
+            } catch (DateTimeParseException e) {
+                throw new BadRequestException("Invalid date format for rangeStart. Expected: yyyy-MM-dd HH:mm:ss");
             }
-            if (rangeEnd != null && !rangeEnd.isBlank()) {
-                endDateTime = parseDateTime(rangeEnd);
-            }
-        } catch (DateTimeParseException e) {
-            throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
         }
 
-        if (startDateTime == null && rangeStart != null && !rangeStart.isBlank()) {
-            throw new BadRequestException("Invalid date format for rangeStart");
-        }
-        if (endDateTime == null && rangeEnd != null && !rangeEnd.isBlank()) {
-            throw new BadRequestException("Invalid date format for rangeEnd");
+        if (rangeEnd != null && !rangeEnd.isBlank()) {
+            try {
+                endDateTime = parseDateTime(rangeEnd);
+                if (endDateTime == null) {
+                    throw new BadRequestException("Invalid date format for rangeEnd: " + rangeEnd);
+                }
+            } catch (DateTimeParseException e) {
+                throw new BadRequestException("Invalid date format for rangeEnd. Expected: yyyy-MM-dd HH:mm:ss");
+            }
         }
 
         if (startDateTime == null) {
@@ -103,7 +110,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         try {
             eventPage = eventRepository.findPublicEventsWithFilters(
                     text,
-                    categories,
+                    categories != null && !categories.isEmpty() ? categories : null,
                     paid,
                     startDateTime,
                     endDateTime,
@@ -135,22 +142,17 @@ public class PublicEventServiceImpl implements PublicEventService {
                 })
                 .collect(Collectors.toList());
 
-        // Сортировка
         if (sort != null) {
-            try {
-                if ("EVENT_DATE".equals(sort)) {
-                    result.sort((e1, e2) -> {
-                        if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
-                        return e1.getEventDate().compareTo(e2.getEventDate());
-                    });
-                } else if ("VIEWS".equals(sort)) {
-                    result.sort((e1, e2) -> {
-                        if (e1.getViews() == null || e2.getViews() == null) return 0;
-                        return e1.getViews().compareTo(e2.getViews());
-                    });
-                }
-            } catch (Exception e) {
-                log.error("Error during sorting: ", e);
+            if ("EVENT_DATE".equals(sort)) {
+                result.sort((e1, e2) -> {
+                    if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
+                    return e1.getEventDate().compareTo(e2.getEventDate());
+                });
+            } else if ("VIEWS".equals(sort)) {
+                result.sort((e1, e2) -> {
+                    if (e1.getViews() == null || e2.getViews() == null) return 0;
+                    return e1.getViews().compareTo(e2.getViews());
+                });
             }
         }
 
@@ -180,8 +182,12 @@ public class PublicEventServiceImpl implements PublicEventService {
                     true
             );
 
-            if (stats == null) {
-                return Map.of();
+            if (stats == null || stats.isEmpty()) {
+                return events.stream()
+                        .collect(Collectors.toMap(
+                                Event::getId,
+                                ee -> 0L
+                        ));
             }
 
             return stats.stream()
@@ -249,6 +255,9 @@ public class PublicEventServiceImpl implements PublicEventService {
         if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
             return null;
         }
+
+        dateTimeStr = dateTimeStr.trim();
+
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (DateTimeParseException e) {
