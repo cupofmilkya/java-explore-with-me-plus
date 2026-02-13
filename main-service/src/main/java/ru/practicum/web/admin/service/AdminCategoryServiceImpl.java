@@ -11,11 +11,10 @@ import ru.practicum.web.admin.dto.NewCategoryDto;
 import ru.practicum.web.admin.entity.Category;
 import ru.practicum.web.admin.mapper.CategoryMapper;
 import ru.practicum.web.admin.repository.CategoryRepository;
+import ru.practicum.web.admin.validation.CategoryValidator;
 import ru.practicum.web.event.repository.EventRepository;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
-import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,89 +24,54 @@ import java.util.stream.Collectors;
 @Transactional
 public class AdminCategoryServiceImpl implements AdminCategoryService {
 
-    private final CategoryRepository repository;
+    private final CategoryRepository categoryRepository;
     private final EventRepository eventRepository;
+    private final CategoryValidator validator;
 
     @Override
     public CategoryDto create(NewCategoryDto dto) {
-        if (dto.getName() == null || dto.getName().isBlank()) {
-            throw new BadRequestException("Category name cannot be empty");
-        }
-        if (dto.getName().length() > ValidationConstants.CATEGORY_NAME_MAX) {
-            throw new BadRequestException("Category name length must be between 1 and " +
-                    ValidationConstants.CATEGORY_NAME_MAX + " characters");
-        }
-
-        if (repository.existsByName(dto.getName())) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
-        }
+        validator.validateCategoryName(dto.getName());
+        validator.checkCategoryNameUnique(dto.getName());
 
         try {
             Category category = Category.builder()
                     .name(dto.getName())
                     .build();
-            return CategoryMapper.toDto(repository.save(category));
+            return CategoryMapper.toDto(categoryRepository.save(category));
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
+            validator.checkCategoryNameUnique(dto.getName());
+            throw e;
         }
     }
 
     @Override
     public CategoryDto update(Long id, CategoryDto dto) {
-        if (dto.getName() == null || dto.getName().isBlank()) {
-            throw new BadRequestException("Category name cannot be empty");
-        }
-        if (dto.getName().length() > ValidationConstants.CATEGORY_NAME_MAX) {
-            throw new BadRequestException("Category name length must be between 1 and " +
-                    ValidationConstants.CATEGORY_NAME_MAX + " characters");
-        }
+        validator.validateCategoryName(dto.getName());
+        validator.validateCategoryExists(id);
+        validator.checkCategoryNameUniqueForUpdate(dto.getName(), id);
 
-        Category category = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
-
-        if (!category.getName().equals(dto.getName()) &&
-                repository.existsByNameAndIdNot(dto.getName(), id)) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
-        }
-
+        Category category = getCategoryOrThrow(id);
         category.setName(dto.getName());
-        return CategoryMapper.toDto(repository.save(category));
+
+        return CategoryMapper.toDto(categoryRepository.save(category));
     }
 
     @Override
     public void delete(Long id) {
-        Category category = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
+        validator.validateCategoryExists(id);
+        checkCategoryNotInUse(id);
 
-        if (eventRepository.existsByCategoryId(id)) {
-            throw new ConflictException("The category is not empty");
-        }
-
-        repository.delete(category);
+        categoryRepository.deleteById(id);
     }
 
     @Override
     public List<CategoryDto> getAll(int from, int size) {
-        if (from < ValidationConstants.PAGE_MIN_FROM) {
-            throw new BadRequestException("Parameter 'from' must be non-negative");
-        }
-        if (size < ValidationConstants.PAGE_MIN_SIZE) {
-            throw new BadRequestException("Parameter 'size' must be positive");
-        }
+        validator.validatePagination(from, size);
 
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
-        return repository.findAll(pageable)
+        return categoryRepository.findAll(pageable)
                 .stream()
                 .map(CategoryMapper::toDto)
                 .collect(Collectors.toList());
@@ -115,8 +79,17 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
 
     @Override
     public CategoryDto getById(Long id) {
-        return repository.findById(id)
-                .map(CategoryMapper::toDto)
+        return CategoryMapper.toDto(getCategoryOrThrow(id));
+    }
+
+    private Category getCategoryOrThrow(Long id) {
+        return categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
+    }
+
+    private void checkCategoryNotInUse(Long categoryId) {
+        if (eventRepository.existsByCategoryId(categoryId)) {
+            throw new ConflictException("The category is not empty");
+        }
     }
 }
