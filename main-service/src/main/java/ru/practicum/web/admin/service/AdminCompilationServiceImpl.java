@@ -9,14 +9,14 @@ import ru.practicum.web.admin.entity.Compilation;
 import ru.practicum.web.admin.entity.UpdateCompilationRequest;
 import ru.practicum.web.admin.mapper.CompilationMapper;
 import ru.practicum.web.admin.repository.CompilationRepository;
+import ru.practicum.web.admin.validation.CompilationValidator;
 import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
-import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,29 +25,16 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
 
     private final CompilationRepository compilationRepository;
     private final EventRepository eventRepository;
+    private final CompilationValidator validator;
 
     @Override
     public CompilationDto create(NewCompilationDto dto) {
-        if (dto.getTitle() == null || dto.getTitle().isBlank()) {
-            throw new BadRequestException("Title must not be blank");
-        }
-        if (dto.getTitle().length() < ValidationConstants.COMPILATION_TITLE_MIN ||
-                dto.getTitle().length() > ValidationConstants.COMPILATION_TITLE_MAX) {
-            throw new BadRequestException("Title length must be between " +
-                    ValidationConstants.COMPILATION_TITLE_MIN + " and " +
-                    ValidationConstants.COMPILATION_TITLE_MAX + " characters");
-        }
+        validator.validateCreateRequest(dto);
 
         Compilation compilation = new Compilation();
         compilation.setTitle(dto.getTitle());
         compilation.setPinned(dto.getPinned() != null ? dto.getPinned() : false);
-
-        if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
-            List<Event> events = eventRepository.findAllById(dto.getEvents());
-            compilation.setEvents(events);
-        } else {
-            compilation.setEvents(new ArrayList<>());
-        }
+        compilation.setEvents(getEventsFromIds(dto.getEvents()));
 
         Compilation saved = compilationRepository.save(compilation);
         return CompilationMapper.toDto(saved);
@@ -55,29 +42,18 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
 
     @Override
     public CompilationDto update(Long id, UpdateCompilationRequest dto) {
-        Compilation compilation = compilationRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Compilation with id=" + id + " was not found"));
+        validator.validateUpdateRequest(dto);
+
+        Compilation compilation = getCompilationOrThrow(id);
 
         if (dto.getTitle() != null) {
-            if (dto.getTitle().isBlank()) {
-                throw new BadRequestException("Title must not be blank");
-            }
-            if (dto.getTitle().length() < ValidationConstants.COMPILATION_TITLE_MIN ||
-                    dto.getTitle().length() > ValidationConstants.COMPILATION_TITLE_MAX) {
-                throw new BadRequestException("Title length must be between " +
-                        ValidationConstants.COMPILATION_TITLE_MIN + " and " +
-                        ValidationConstants.COMPILATION_TITLE_MAX + " characters");
-            }
             compilation.setTitle(dto.getTitle());
         }
-
         if (dto.getPinned() != null) {
             compilation.setPinned(dto.getPinned());
         }
-
         if (dto.getEvents() != null) {
-            List<Event> events = eventRepository.findAllById(dto.getEvents());
-            compilation.setEvents(events);
+            compilation.setEvents(getEventsFromIds(dto.getEvents()));
         }
 
         Compilation updated = compilationRepository.save(compilation);
@@ -86,9 +62,28 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
 
     @Override
     public void delete(Long id) {
-        if (!compilationRepository.existsById(id)) {
-            throw new NotFoundException("Compilation with id=" + id + " was not found");
-        }
+        validator.validateCompilationExists(compilationRepository.existsById(id), id);
         compilationRepository.deleteById(id);
+    }
+
+    private Compilation getCompilationOrThrow(Long id) {
+        return compilationRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Compilation with id=" + id + " was not found"));
+    }
+
+    private List<Event> getEventsFromIds(List<Long> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Event> events = eventRepository.findAllById(eventIds);
+        if (events.size() != eventIds.size()) {
+            List<Long> foundIds = events.stream().map(Event::getId).collect(Collectors.toList());
+            List<Long> notFoundIds = eventIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+            throw new NotFoundException("Events with ids=" + notFoundIds + " not found");
+        }
+        return events;
     }
 }
