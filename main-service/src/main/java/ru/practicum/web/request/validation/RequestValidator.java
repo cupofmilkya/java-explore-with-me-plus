@@ -3,6 +3,7 @@ package ru.practicum.web.request.validation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.request.entity.ParticipationRequest;
@@ -22,7 +23,7 @@ public class RequestValidator {
         if (event.getInitiator().getId().equals(userId)) {
             throw new ConflictException("Initiator cannot participate in his own event");
         }
-        if (event.getStatus() != Event.Status.PUBLISHED) {
+        if (event.getStatus() != EventStatus.PUBLISHED) {
             throw new ConflictException("Event is not published");
         }
         if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {

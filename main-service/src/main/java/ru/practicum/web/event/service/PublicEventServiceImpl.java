@@ -12,6 +12,7 @@ import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.event.repository.EventSpecification;
@@ -41,7 +42,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     @Override
     public EventDto getEvent(Long id) {
-        Event event = eventRepository.findByIdAndStatus(id, Event.Status.PUBLISHED)
+        Event event = eventRepository.findByIdAndStatus(id, EventStatus.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
         Long views = getViewsForEvent(event);

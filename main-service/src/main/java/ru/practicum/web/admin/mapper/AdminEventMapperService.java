@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ru.practicum.web.admin.entity.UpdateEventAdminRequest;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 
 import java.time.LocalDateTime;
 
@@ -45,11 +46,11 @@ public class AdminEventMapperService {
 
         switch (stateAction) {
             case "PUBLISH_EVENT":
-                event.setStatus(Event.Status.PUBLISHED);
+                event.setStatus(EventStatus.PUBLISHED);
                 event.setPublishedOn(LocalDateTime.now());
                 break;
             case "REJECT_EVENT":
-                event.setStatus(Event.Status.CANCELED);
+                event.setStatus(EventStatus.CANCELED);
                 break;
             default:
                 throw new IllegalArgumentException("Invalid state action: " + stateAction);

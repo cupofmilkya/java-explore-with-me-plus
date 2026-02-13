@@ -3,6 +3,7 @@ package ru.practicum.web.admin.validation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.validation.ValidationConstants;
@@ -58,7 +59,7 @@ public class AdminEventValidator {
     }
 
     public void validatePublishEvent(Event event) {
-        if (event.getStatus() != Event.Status.PENDING) {
+        if (event.getStatus() != EventStatus.PENDING) {
             throw new ConflictException("Cannot publish the event because it's not in the right state: " + event.getStatus());
         }
         if (event.getEventDate().isBefore(LocalDateTime.now().plusHours(ValidationConstants.EVENT_PUBLISH_HOURS_BEFORE))) {
@@ -67,7 +68,7 @@ public class AdminEventValidator {
     }
 
     public void validateRejectEvent(Event event) {
-        if (event.getStatus() == Event.Status.PUBLISHED) {
+        if (event.getStatus() == EventStatus.PUBLISHED) {
             throw new ConflictException("Cannot reject already published event");
         }
     }

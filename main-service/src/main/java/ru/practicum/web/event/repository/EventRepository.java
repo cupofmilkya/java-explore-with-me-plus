@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,7 +16,7 @@ import java.util.Optional;
 public interface EventRepository extends JpaRepository<Event, Long>,
         JpaSpecificationExecutor<Event> {
 
-    Optional<Event> findByIdAndStatus(Long id, Event.Status status);
+    Optional<Event> findByIdAndStatus(Long id, EventStatus status);
 
     Page<Event> findByInitiatorId(Long initiatorId, Pageable pageable);
 
@@ -31,7 +32,7 @@ public interface EventRepository extends JpaRepository<Event, Long>,
             "(cast(:end AS timestamp) IS NULL OR e.eventDate <= :end)")
     Page<Event> findEventsByAdminFilters(
             @Param("users") List<Long> users,
-            @Param("statuses") List<Event.Status> statuses,
+            @Param("statuses") List<EventStatus> statuses,
             @Param("categories") List<Long> categories,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end,

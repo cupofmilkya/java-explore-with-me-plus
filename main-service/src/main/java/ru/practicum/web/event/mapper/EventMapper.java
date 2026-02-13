@@ -5,6 +5,7 @@ import ru.practicum.web.admin.dto.UserShortDto;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.validation.ValidationConstants;
 
 import java.time.LocalDateTime;
@@ -25,7 +26,7 @@ public class EventMapper {
         dto.setAnnotation(event.getAnnotation());
         dto.setDescription(event.getDescription());
         dto.setEventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null);
-        dto.setState(event.getStatus() != null ? event.getStatus().name() : Event.Status.PENDING.name());
+        dto.setState(event.getStatus() != null ? event.getStatus().name() : EventStatus.PENDING.name());
         dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
         dto.setParticipantLimit(event.getParticipantLimit() != null ? event.getParticipantLimit() : 0);
         dto.setRequestModeration(event.getRequestModeration() != null ? event.getRequestModeration() : true);
@@ -77,9 +78,9 @@ public class EventMapper {
 
         if (dto.getState() != null) {
             try {
-                event.setStatus(Event.Status.valueOf(dto.getState()));
+                event.setStatus(EventStatus.valueOf(dto.getState()));
             } catch (IllegalArgumentException e) {
-                event.setStatus(Event.Status.PENDING);
+                event.setStatus(EventStatus.PENDING);
             }
         }
 
@@ -127,7 +128,7 @@ public class EventMapper {
 
         if (dto.getState() != null) {
             try {
-                event.setStatus(Event.Status.valueOf(dto.getState()));
+                event.setStatus(EventStatus.valueOf(dto.getState()));
             } catch (IllegalArgumentException e) {
                 // Игнорируем некорректный статус
             }

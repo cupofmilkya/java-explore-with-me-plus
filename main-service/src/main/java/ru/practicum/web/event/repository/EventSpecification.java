@@ -2,6 +2,7 @@ package ru.practicum.web.event.repository;
 
 import org.springframework.data.jpa.domain.Specification;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.validation.ValidationConstants;
 
 import jakarta.persistence.criteria.Predicate;
@@ -22,7 +23,7 @@ public class EventSpecification {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            predicates.add(cb.equal(root.get("status"), Event.Status.PUBLISHED));
+            predicates.add(cb.equal(root.get("status"), EventStatus.PUBLISHED));
 
             if (text != null && !text.isBlank()) {
                 String pattern = "%" + text.toLowerCase() + "%";

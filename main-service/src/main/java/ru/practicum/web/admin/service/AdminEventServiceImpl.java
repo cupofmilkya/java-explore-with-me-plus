@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import ru.practicum.web.admin.entity.UpdateEventAdminRequest;
 import ru.practicum.web.admin.mapper.AdminEventMapperService;
 import ru.practicum.web.admin.repository.CategoryRepository;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.stats.StatsService;
 import ru.practicum.web.admin.utils.DateUtils;
 import ru.practicum.web.admin.validation.AdminEventValidator;
@@ -51,7 +52,7 @@ public class AdminEventServiceImpl implements AdminEventService {
         LocalDateTime start = dateUtils.parseDateTime(rangeStart);
         LocalDateTime end = dateUtils.parseDateTime(rangeEnd);
 
-        List<Event.Status> statusEnums = parseStates(states);
+        List<EventStatus> statusEnums = parseStates(states);
 
         Page<Event> eventPage = eventRepository.findEventsByAdminFilters(
                 users != null && !users.isEmpty() ? users : null,
@@ -111,13 +112,13 @@ public class AdminEventServiceImpl implements AdminEventService {
         }
     }
 
-    private List<Event.Status> parseStates(List<String> states) {
+    private List<EventStatus> parseStates(List<String> states) {
         if (states == null || states.isEmpty()) {
             return null;
         }
         try {
             return states.stream()
-                    .map(Event.Status::valueOf)
+                    .map(EventStatus::valueOf)
                     .toList();
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid state value: " + states);

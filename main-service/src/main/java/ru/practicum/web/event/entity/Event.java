@@ -3,7 +3,6 @@ package ru.practicum.web.event.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import ru.practicum.web.admin.entity.Category;
-import ru.practicum.web.request.entity.RequestStatus;
 import ru.practicum.web.user.entity.User;
 
 import java.time.LocalDateTime;
@@ -55,7 +54,7 @@ public class Event {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private RequestStatus status = RequestStatus.PENDING;
+    private EventStatus status = EventStatus.PENDING;
 
     @Column(name = "created_on", nullable = false)
     private LocalDateTime createdOn;

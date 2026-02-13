@@ -13,6 +13,7 @@ import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.dto.NewEventDto;
 import ru.practicum.web.event.dto.UpdateEventUserRequest;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.BadRequestException;
@@ -87,7 +88,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .paid(dto.getPaid() != null ? dto.getPaid() : false)
                 .participantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0)
                 .requestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true)
-                .status(Event.Status.PENDING)
+                .status(EventStatus.PENDING)
                 .createdOn(LocalDateTime.now())
                 .confirmedRequests(ValidationConstants.DEFAULT_CONFIRMED_REQUESTS)
                 .views(ValidationConstants.DEFAULT_VIEWS)
@@ -121,7 +122,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        if (event.getStatus() == Event.Status.PUBLISHED) {
+        if (event.getStatus() == EventStatus.PUBLISHED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
 
@@ -165,10 +166,10 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         if (updateRequest.getStateAction() != null) {
             switch (updateRequest.getStateAction()) {
                 case "SEND_TO_REVIEW":
-                    event.setStatus(Event.Status.PENDING);
+                    event.setStatus(EventStatus.PENDING);
                     break;
                 case "CANCEL_REVIEW":
-                    event.setStatus(Event.Status.CANCELED);
+                    event.setStatus(EventStatus.CANCELED);
                     break;
             }
         }
