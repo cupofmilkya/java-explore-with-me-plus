@@ -6,6 +6,7 @@ import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.request.entity.ParticipationRequest;
+import ru.practicum.web.request.entity.RequestStatus;
 import ru.practicum.web.request.repository.ParticipationRequestRepository;
 import ru.practicum.web.user.entity.User;
 
@@ -29,7 +30,7 @@ public class RequestValidator {
         }
 
         int confirmedRequests = requestRepository.countByEventIdAndStatus(
-                eventId, ParticipationRequest.RequestStatus.CONFIRMED);
+                eventId, RequestStatus.CONFIRMED);
         if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
             throw new ConflictException("Participant limit reached");
         }
@@ -72,7 +73,7 @@ public class RequestValidator {
             if (!request.getEvent().getId().equals(eventId)) {
                 throw new NotFoundException("Request with id=" + request.getId() + " not found for this event");
             }
-            if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
+            if (request.getStatus() != RequestStatus.PENDING) {
                 throw new ConflictException("Request must have status PENDING");
             }
         }
@@ -81,7 +82,7 @@ public class RequestValidator {
 
     public int checkAvailableSlots(Event event) {
         int confirmedRequests = requestRepository.countByEventIdAndStatus(
-                event.getId(), ParticipationRequest.RequestStatus.CONFIRMED);
+                event.getId(), RequestStatus.CONFIRMED);
         int participantLimit = event.getParticipantLimit();
 
         if (confirmedRequests >= participantLimit) {

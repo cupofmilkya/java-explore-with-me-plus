@@ -8,6 +8,7 @@ import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.web.request.dto.ParticipationRequestDto;
 import ru.practicum.web.request.entity.ParticipationRequest;
+import ru.practicum.web.request.entity.RequestStatus;
 import ru.practicum.web.request.mapper.RequestMapperService;
 import ru.practicum.web.request.repository.ParticipationRequestRepository;
 
@@ -34,11 +35,11 @@ public class RequestStatusUpdateService {
         int confirmedCount = 0;
         for (ParticipationRequest request : requests) {
             if (confirmedCount < availableSlots) {
-                request.setStatus(ParticipationRequest.RequestStatus.CONFIRMED);
+                request.setStatus(RequestStatus.CONFIRMED);
                 confirmedCount++;
                 confirmedList.add(mapperService.toDto(request));
             } else {
-                request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
+                request.setStatus(RequestStatus.REJECTED);
                 rejectedList.add(mapperService.toDto(request));
             }
             requestRepository.save(request);
@@ -58,7 +59,7 @@ public class RequestStatusUpdateService {
         List<ParticipationRequestDto> rejectedList = new ArrayList<>();
 
         for (ParticipationRequest request : requests) {
-            request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
+            request.setStatus(RequestStatus.REJECTED);
             requestRepository.save(request);
             rejectedList.add(mapperService.toDto(request));
         }

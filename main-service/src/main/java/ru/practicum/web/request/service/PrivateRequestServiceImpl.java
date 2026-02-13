@@ -11,6 +11,7 @@ import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.web.request.dto.ParticipationRequestDto;
 import ru.practicum.web.request.entity.ParticipationRequest;
+import ru.practicum.web.request.entity.RequestStatus;
 import ru.practicum.web.request.mapper.RequestMapperService;
 import ru.practicum.web.request.repository.ParticipationRequestRepository;
 import ru.practicum.web.request.validation.RequestValidator;
@@ -50,7 +51,7 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         ParticipationRequest request = mapperService.createRequest(user, event);
         ParticipationRequest saved = requestRepository.save(request);
 
-        if (saved.getStatus() == ParticipationRequest.RequestStatus.CONFIRMED) {
+        if (saved.getStatus() == RequestStatus.CONFIRMED) {
             event.setConfirmedRequests(event.getConfirmedRequests() + 1);
             eventRepository.save(event);
         }
@@ -63,7 +64,7 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
         checkUserExists(userId);
 
         ParticipationRequest request = validator.validateAndGetRequestForCancellation(requestId, userId);
-        request.setStatus(ParticipationRequest.RequestStatus.CANCELED);
+        request.setStatus(RequestStatus.CANCELED);
 
         return mapperService.toDto(requestRepository.save(request));
     }
