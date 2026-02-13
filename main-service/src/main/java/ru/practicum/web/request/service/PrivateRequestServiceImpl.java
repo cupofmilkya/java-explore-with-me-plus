@@ -11,13 +11,12 @@ import ru.practicum.web.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.web.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.web.request.dto.ParticipationRequestDto;
 import ru.practicum.web.request.entity.ParticipationRequest;
-import ru.practicum.web.request.mapper.ParticipationRequestMapper;
+import ru.practicum.web.request.mapper.RequestMapperService;
 import ru.practicum.web.request.repository.ParticipationRequestRepository;
+import ru.practicum.web.request.validation.RequestValidator;
 import ru.practicum.web.user.entity.User;
 import ru.practicum.web.user.repository.UserRepository;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,77 +28,53 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
     private final ParticipationRequestRepository requestRepository;
     private final UserRepository userRepository;
     private final EventRepository eventRepository;
+    private final RequestValidator validator;
+    private final RequestMapperService mapperService;
+    private final RequestStatusUpdateService statusUpdateService;
 
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("User with id=" + userId + " was not found");
-        }
+        checkUserExists(userId);
         return requestRepository.findAllByRequesterId(userId).stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(mapperService::toDto)
                 .collect(Collectors.toList());
     }
 
     @Override
     public ParticipationRequestDto addRequest(Long userId, Long eventId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        User user = getUserOrThrow(userId);
+        Event event = getEventOrThrow(eventId);
 
-        if (event.getInitiator().getId().equals(userId)) {
-            throw new ConflictException("Initiator cannot participate in his own event");
-        }
-        if (event.getStatus() != Event.Status.PUBLISHED) {
-            throw new ConflictException("Event is not published");
-        }
-        if (requestRepository.existsByEventIdAndRequesterId(eventId, userId)) {
-            throw new ConflictException("Request already exists");
-        }
+        validator.validateAddRequest(user, event, userId, eventId);
 
-        int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
-        if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
-            throw new ConflictException("Participant limit reached");
-        }
-
-        ParticipationRequest request = ParticipationRequest.builder()
-                .created(LocalDateTime.now().withNano(0))
-                .event(event)
-                .requester(user)
-                .status(event.getParticipantLimit() == 0 || !event.getRequestModeration()
-                        ? ParticipationRequest.RequestStatus.CONFIRMED
-                        : ParticipationRequest.RequestStatus.PENDING)
-                .build();
-
+        ParticipationRequest request = mapperService.createRequest(user, event);
         ParticipationRequest saved = requestRepository.save(request);
+
         if (saved.getStatus() == ParticipationRequest.RequestStatus.CONFIRMED) {
             event.setConfirmedRequests(event.getConfirmedRequests() + 1);
             eventRepository.save(event);
         }
-        return ParticipationRequestMapper.toDto(saved);
+
+        return mapperService.toDto(saved);
     }
 
     @Override
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
-        ParticipationRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
-        if (!request.getRequester().getId().equals(userId)) {
-            throw new NotFoundException("Request not found");
-        }
+        checkUserExists(userId);
+
+        ParticipationRequest request = validator.validateAndGetRequestForCancellation(requestId, userId);
         request.setStatus(ParticipationRequest.RequestStatus.CANCELED);
-        ParticipationRequest updated = requestRepository.save(request);
-        return ParticipationRequestMapper.toDto(updated);
+
+        return mapperService.toDto(requestRepository.save(request));
     }
 
     @Override
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
-        if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("User with id=" + userId + " was not found");
-        }
-        Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        checkUserExists(userId);
+        Event event = getEventAndCheckOwnership(userId, eventId);
+
         return requestRepository.findAllByEventId(eventId).stream()
-                .map(ParticipationRequestMapper::toDto)
+                .map(mapperService::toDto)
                 .collect(Collectors.toList());
     }
 
@@ -109,76 +84,44 @@ public class PrivateRequestServiceImpl implements PrivateRequestService {
             Long eventId,
             EventRequestStatusUpdateRequest statusUpdateRequest
     ) {
-        Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        Event event = getEventAndCheckOwnership(userId, eventId);
 
-        if (event.getParticipantLimit() == 0) {
-            throw new ConflictException("The participant limit has been reached");
-        }
-        if (!event.getRequestModeration()) {
-            throw new ConflictException("The participant limit has been reached");
-        }
+        validator.validateEventForRequestUpdate(event);
 
-        List<ParticipationRequest> requests = requestRepository.findAllById(statusUpdateRequest.getRequestIds());
-        if (requests.isEmpty()) {
-            throw new ConflictException("Request ids list is empty");
-        }
-
-        for (ParticipationRequest request : requests) {
-            if (!request.getEvent().getId().equals(eventId)) {
-                throw new NotFoundException("Request with id=" + request.getId() + " not found for this event");
-            }
-        }
-
-        int confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, ParticipationRequest.RequestStatus.CONFIRMED);
-        int participantLimit = event.getParticipantLimit();
-
-        if (confirmedRequests >= participantLimit) {
-            throw new ConflictException("The participant limit has been reached");
-        }
-
-        int availableSlots = participantLimit - confirmedRequests;
-        List<ParticipationRequestDto> confirmedRequestsList = new ArrayList<>();
-        List<ParticipationRequestDto> rejectedRequestsList = new ArrayList<>();
+        List<ParticipationRequest> requests = validator.validateAndGetRequestsForUpdate(
+                statusUpdateRequest.getRequestIds(), eventId, statusUpdateRequest.getStatus());
 
         if ("CONFIRMED".equals(statusUpdateRequest.getStatus())) {
-            for (ParticipationRequest request : requests) {
-                if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
-                    throw new ConflictException("Request must have status PENDING");
-                }
-            }
-            int confirmedCount = 0;
-            for (ParticipationRequest request : requests) {
-                if (confirmedCount < availableSlots) {
-                    request.setStatus(ParticipationRequest.RequestStatus.CONFIRMED);
-                    confirmedCount++;
-                    confirmedRequestsList.add(ParticipationRequestMapper.toDto(request));
-                } else {
-                    request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
-                    rejectedRequestsList.add(ParticipationRequestMapper.toDto(request));
-                }
-                requestRepository.save(request);
-            }
-            event.setConfirmedRequests(event.getConfirmedRequests() + confirmedCount);
-            eventRepository.save(event);
+            int availableSlots = validator.checkAvailableSlots(event);
+            return statusUpdateService.confirmRequests(requests, event, availableSlots);
         } else if ("REJECTED".equals(statusUpdateRequest.getStatus())) {
-            for (ParticipationRequest request : requests) {
-                if (request.getStatus() != ParticipationRequest.RequestStatus.PENDING) {
-                    throw new ConflictException("Request must have status PENDING");
-                }
-            }
-            for (ParticipationRequest request : requests) {
-                request.setStatus(ParticipationRequest.RequestStatus.REJECTED);
-                requestRepository.save(request);
-                rejectedRequestsList.add(ParticipationRequestMapper.toDto(request));
-            }
+            return statusUpdateService.rejectRequests(requests);
         } else {
             throw new ConflictException("Invalid status: " + statusUpdateRequest.getStatus());
         }
+    }
 
-        return EventRequestStatusUpdateResult.builder()
-                .confirmedRequests(confirmedRequestsList)
-                .rejectedRequests(rejectedRequestsList)
-                .build();
+    private void checkUserExists(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new NotFoundException("User with id=" + userId + " was not found");
+        }
+    }
+
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
+    }
+
+    private Event getEventOrThrow(Long eventId) {
+        return eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+    }
+
+    private Event getEventAndCheckOwnership(Long userId, Long eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+
+        validator.validateAndCheckEventOwnership(event, userId);
+        return event;
     }
 }
