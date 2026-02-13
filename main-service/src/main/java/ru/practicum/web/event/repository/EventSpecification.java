@@ -2,6 +2,7 @@ package ru.practicum.web.event.repository;
 
 import org.springframework.data.jpa.domain.Specification;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.validation.ValidationConstants;
 
 import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDateTime;
@@ -11,7 +12,6 @@ import java.util.List;
 public class EventSpecification {
 
     public static Specification<Event> publicEvents(
-            Event.Status status,
             String text,
             List<Long> categories,
             Boolean paid,
@@ -20,10 +20,9 @@ public class EventSpecification {
             Boolean onlyAvailable
     ) {
         return (root, query, cb) -> {
-
             List<Predicate> predicates = new ArrayList<>();
 
-            predicates.add(cb.equal(root.get("status"), status));
+            predicates.add(cb.equal(root.get("status"), Event.Status.PUBLISHED));
 
             if (text != null && !text.isBlank()) {
                 String pattern = "%" + text.toLowerCase() + "%";
@@ -51,7 +50,7 @@ public class EventSpecification {
 
             if (Boolean.TRUE.equals(onlyAvailable)) {
                 predicates.add(cb.or(
-                        cb.equal(root.get("participantLimit"), 0),
+                        cb.equal(root.get("participantLimit"), ValidationConstants.EVENT_PARTICIPANT_LIMIT_MIN),
                         cb.lessThan(root.get("confirmedRequests"), root.get("participantLimit"))
                 ));
             }

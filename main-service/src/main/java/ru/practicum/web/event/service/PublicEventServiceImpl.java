@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.statsclient.StatsClient;
@@ -71,7 +72,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         int actualSize = size > 0 ? size : ValidationConstants.PAGE_DEFAULT_SIZE;
 
         int page = from / actualSize;
-        Pageable pageable = PageRequest.of(page, actualSize);
+        Pageable pageable = PageRequest.of(page, actualSize, getSort(sort));
 
         log.info("Getting events with from={}, actualSize={}, page={}", from, actualSize, page);
 
@@ -93,7 +94,6 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         Page<Event> eventPage = eventRepository.findAll(
                 EventSpecification.publicEvents(
-                        Event.Status.PUBLISHED,
                         text,
                         categories,
                         paid,
@@ -124,21 +124,27 @@ public class PublicEventServiceImpl implements PublicEventService {
                 })
                 .collect(Collectors.toList());
 
-        if (sort != null) {
-            if ("EVENT_DATE".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
-                    return e1.getEventDate().compareTo(e2.getEventDate());
-                });
-            } else if ("VIEWS".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getViews() == null || e2.getViews() == null) return 0;
-                    return e1.getViews().compareTo(e2.getViews());
-                });
-            }
-        }
+        // Сортировка теперь выполняется на уровне БД через Sort в PageRequest
+        // Этот блок можно удалить, так как сортировка уже применена в pageable
+        // Но оставим на случай, если нужна дополнительная сортировка в Java
 
         return result;
+    }
+
+    private Sort getSort(String sort) {
+        if (sort == null) {
+            return Sort.unsorted();
+        }
+        if ("EVENT_DATE".equals(sort)) {
+            return Sort.by(Sort.Direction.ASC, "eventDate");
+        }
+        if ("VIEWS".equals(sort)) {
+            // ВНИМАНИЕ: views - это @Transient поле, оно не хранится в БД!
+            // Сортировка по views на уровне БД невозможна
+            // Поэтому возвращаем unsorted и сортируем в Java
+            return Sort.unsorted();
+        }
+        return Sort.unsorted();
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
@@ -172,7 +178,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                         ));
             }
 
-            return stats.stream()
+            Map<Long, Long> viewsMap = stats.stream()
                     .filter(stat -> stat != null && stat.getUri() != null)
                     .map(stat -> {
                         Long id = extractEventIdFromUri(stat.getUri());
@@ -184,6 +190,13 @@ public class PublicEventServiceImpl implements PublicEventService {
                             Map.Entry::getValue,
                             (a, b) -> a
                     ));
+
+            // Добавляем события без статистики
+            events.stream()
+                    .filter(e -> e.getId() != null && !viewsMap.containsKey(e.getId()))
+                    .forEach(e -> viewsMap.put(e.getId(), ValidationConstants.DEFAULT_VIEWS));
+
+            return viewsMap;
 
         } catch (Exception e) {
             log.error("Error getting stats", e);
