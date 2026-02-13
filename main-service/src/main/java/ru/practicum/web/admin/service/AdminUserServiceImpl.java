@@ -6,15 +6,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
-import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.user.dto.NewUserRequest;
 import ru.practicum.web.user.dto.UserDto;
 import ru.practicum.web.user.entity.User;
 import ru.practicum.web.user.mapper.UserMapper;
 import ru.practicum.web.user.repository.UserRepository;
-import ru.practicum.web.validation.ValidationConstants;
+import ru.practicum.web.user.validator.UserValidator;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,55 +23,31 @@ import java.util.stream.Collectors;
 public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepository;
+    private final UserValidator validator;
 
     @Override
     public UserDto create(NewUserRequest request) {
-        if (request.getEmail() == null || request.getEmail().isBlank()) {
-            throw new BadRequestException("Email must not be blank");
-        }
-        if (request.getEmail().length() < ValidationConstants.USER_EMAIL_MIN ||
-                request.getEmail().length() > ValidationConstants.USER_EMAIL_MAX) {
-            throw new BadRequestException("Email length must be between " +
-                    ValidationConstants.USER_EMAIL_MIN + " and " + ValidationConstants.USER_EMAIL_MAX + " characters");
-        }
-        if (!request.getEmail().contains("@")) {
-            throw new BadRequestException("Invalid email format");
-        }
-
-        if (request.getName() == null || request.getName().isBlank()) {
-            throw new BadRequestException("Name must not be blank");
-        }
-        if (request.getName().length() < ValidationConstants.USER_NAME_MIN ||
-                request.getName().length() > ValidationConstants.USER_NAME_MAX) {
-            throw new BadRequestException("Name length must be between " +
-                    ValidationConstants.USER_NAME_MIN + " and " + ValidationConstants.USER_NAME_MAX + " characters");
-        }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("User with email " + request.getEmail() + " already exists");
-        }
+        validator.validateCreateRequest(request);
 
         try {
-            User user = User.builder()
-                    .name(request.getName())
-                    .email(request.getEmail())
-                    .build();
+            User user = UserMapper.fromNewUserRequest(request);
             return UserMapper.toDto(userRepository.save(user));
         } catch (DataIntegrityViolationException e) {
+            validator.checkEmailUnique(request.getEmail());
             throw new ConflictException("User with email " + request.getEmail() + " already exists");
         }
     }
 
     @Override
     public void delete(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("User with id=" + userId + " was not found");
-        }
+        validator.validateUserExists(userId);
         userRepository.deleteById(userId);
     }
 
     @Override
     public List<UserDto> getUsers(List<Long> ids, int from, int size) {
+        validator.validatePagination(from, size);
+
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
