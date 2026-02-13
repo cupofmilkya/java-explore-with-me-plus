@@ -13,6 +13,7 @@ import ru.practicum.web.event.entity.Event;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +31,11 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
         if (dto.getTitle() == null || dto.getTitle().isBlank()) {
             throw new BadRequestException("Title must not be blank");
         }
-        if (dto.getTitle().length() < 1 || dto.getTitle().length() > 50) {
-            throw new BadRequestException("Title length must be between 1 and 50 characters");
+        if (dto.getTitle().length() < ValidationConstants.COMPILATION_TITLE_MIN ||
+                dto.getTitle().length() > ValidationConstants.COMPILATION_TITLE_MAX) {
+            throw new BadRequestException("Title length must be between " +
+                    ValidationConstants.COMPILATION_TITLE_MIN + " and " +
+                    ValidationConstants.COMPILATION_TITLE_MAX + " characters");
         }
 
         Compilation compilation = new Compilation();
@@ -58,8 +62,11 @@ public class AdminCompilationServiceImpl implements AdminCompilationService {
             if (dto.getTitle().isBlank()) {
                 throw new BadRequestException("Title must not be blank");
             }
-            if (dto.getTitle().length() < 1 || dto.getTitle().length() > 50) {
-                throw new BadRequestException("Title length must be between 1 and 50 characters");
+            if (dto.getTitle().length() < ValidationConstants.COMPILATION_TITLE_MIN ||
+                    dto.getTitle().length() > ValidationConstants.COMPILATION_TITLE_MAX) {
+                throw new BadRequestException("Title length must be between " +
+                        ValidationConstants.COMPILATION_TITLE_MIN + " and " +
+                        ValidationConstants.COMPILATION_TITLE_MAX + " characters");
             }
             compilation.setTitle(dto.getTitle());
         }

@@ -17,6 +17,7 @@ import ru.practicum.web.event.repository.EventSpecification;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,7 +36,7 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     private final EventRepository eventRepository;
     private final StatsClient statsClient;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(ValidationConstants.DATE_TIME_FORMAT);
 
     @Override
     public EventDto getEvent(Long id) {
@@ -63,11 +64,11 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
-        if (from < 0) {
+        if (from < ValidationConstants.PAGE_MIN_FROM) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
 
-        int actualSize = size > 0 ? size : 10;
+        int actualSize = size > 0 ? size : ValidationConstants.PAGE_DEFAULT_SIZE;
 
         int page = from / actualSize;
         Pageable pageable = PageRequest.of(page, actualSize);
@@ -114,11 +115,11 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         List<EventShortDto> result = events.stream()
                 .map(event -> {
-                    Long views = viewsMap.getOrDefault(event.getId(), 0L);
+                    Long views = viewsMap.getOrDefault(event.getId(), ValidationConstants.DEFAULT_VIEWS);
                     EventShortDto dto = EventMapper.toShortDto(event);
                     dto.setViews(views);
                     dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
-                            event.getConfirmedRequests() : 0L);
+                            event.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -167,7 +168,7 @@ public class PublicEventServiceImpl implements PublicEventService {
                         .filter(e -> e.getId() != null)
                         .collect(Collectors.toMap(
                                 Event::getId,
-                                e -> 0L
+                                e -> ValidationConstants.DEFAULT_VIEWS
                         ));
             }
 
@@ -190,14 +191,14 @@ public class PublicEventServiceImpl implements PublicEventService {
                     .filter(ee -> ee.getId() != null)
                     .collect(Collectors.toMap(
                             Event::getId,
-                            ee -> 0L
+                            ee -> ValidationConstants.DEFAULT_VIEWS
                     ));
         }
     }
 
     private Long getViewsForEvent(Event event) {
         if (event == null || event.getId() == null) {
-            return 0L;
+            return ValidationConstants.DEFAULT_VIEWS;
         }
 
         try {
@@ -214,12 +215,12 @@ public class PublicEventServiceImpl implements PublicEventService {
             );
 
             if (stats == null || stats.isEmpty()) {
-                return 0L;
+                return ValidationConstants.DEFAULT_VIEWS;
             }
             return stats.get(0).getHits();
         } catch (Exception e) {
             log.error("Error getting views for event {}: {}", event.getId(), e.getMessage());
-            return 0L;
+            return ValidationConstants.DEFAULT_VIEWS;
         }
     }
 
@@ -243,7 +244,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (DateTimeParseException e) {
-            throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
+            throw new BadRequestException("Invalid date format. Expected: " + ValidationConstants.DATE_TIME_FORMAT);
         }
     }
 }

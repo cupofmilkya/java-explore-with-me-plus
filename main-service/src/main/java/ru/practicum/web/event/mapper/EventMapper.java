@@ -5,13 +5,14 @@ import ru.practicum.web.admin.dto.UserShortDto;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class EventMapper {
 
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(ValidationConstants.DATE_TIME_FORMAT);
 
     public static EventDto toDto(Event event) {
         if (event == null) {
@@ -30,8 +31,8 @@ public class EventMapper {
         dto.setRequestModeration(event.getRequestModeration() != null ? event.getRequestModeration() : true);
         dto.setCreatedOn(event.getCreatedOn() != null ? event.getCreatedOn().format(FORMATTER) : null);
         dto.setPublishedOn(event.getPublishedOn() != null ? event.getPublishedOn().format(FORMATTER) : null);
-        dto.setViews(event.getViews() != null ? event.getViews() : 0L);
-        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
+        dto.setViews(event.getViews() != null ? event.getViews() : ValidationConstants.DEFAULT_VIEWS);
+        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
         dto.setLocation(event.getLocation());
 
         if (event.getCategory() != null) {
@@ -85,8 +86,8 @@ public class EventMapper {
         event.setPaid(dto.getPaid() != null ? dto.getPaid() : false);
         event.setParticipantLimit(dto.getParticipantLimit() != null ? dto.getParticipantLimit() : 0);
         event.setRequestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true);
-        event.setConfirmedRequests(dto.getConfirmedRequests() != null ? dto.getConfirmedRequests() : 0L);
-        event.setViews(dto.getViews() != null ? dto.getViews() : 0L);
+        event.setConfirmedRequests(dto.getConfirmedRequests() != null ? dto.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
+        event.setViews(dto.getViews() != null ? dto.getViews() : ValidationConstants.DEFAULT_VIEWS);
 
         if (dto.getCreatedOn() != null && !dto.getCreatedOn().isEmpty()) {
             try {
@@ -164,8 +165,8 @@ public class EventMapper {
         dto.setAnnotation(event.getAnnotation());
         dto.setEventDate(event.getEventDate() != null ? event.getEventDate().format(FORMATTER) : null);
         dto.setPaid(event.getPaid() != null ? event.getPaid() : false);
-        dto.setViews(event.getViews() != null ? event.getViews() : 0L);
-        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L);
+        dto.setViews(event.getViews() != null ? event.getViews() : ValidationConstants.DEFAULT_VIEWS);
+        dto.setConfirmedRequests(event.getConfirmedRequests() != null ? event.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
         dto.setLocation(event.getLocation());
 
         CategoryDto categoryDto = new CategoryDto();
@@ -173,8 +174,8 @@ public class EventMapper {
             categoryDto.setId(event.getCategory().getId());
             categoryDto.setName(event.getCategory().getName());
         } else {
-            categoryDto.setId(0L);
-            categoryDto.setName("Unknown");
+            categoryDto.setId(ValidationConstants.DEFAULT_ID);
+            categoryDto.setName(ValidationConstants.DEFAULT_NAME);
         }
         dto.setCategory(categoryDto);
 
@@ -183,8 +184,8 @@ public class EventMapper {
             userDto.setId(event.getInitiator().getId());
             userDto.setName(event.getInitiator().getName());
         } else {
-            userDto.setId(0L);
-            userDto.setName("Unknown");
+            userDto.setId(ValidationConstants.DEFAULT_ID);
+            userDto.setName(ValidationConstants.DEFAULT_NAME);
         }
         dto.setInitiator(userDto);
 

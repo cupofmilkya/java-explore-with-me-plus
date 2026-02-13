@@ -14,6 +14,7 @@ import ru.practicum.web.user.dto.UserDto;
 import ru.practicum.web.user.entity.User;
 import ru.practicum.web.user.mapper.UserMapper;
 import ru.practicum.web.user.repository.UserRepository;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,8 +31,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             throw new BadRequestException("Email must not be blank");
         }
-        if (request.getEmail().length() < 6 || request.getEmail().length() > 254) {
-            throw new BadRequestException("Email length must be between 6 and 254 characters");
+        if (request.getEmail().length() < ValidationConstants.USER_EMAIL_MIN ||
+                request.getEmail().length() > ValidationConstants.USER_EMAIL_MAX) {
+            throw new BadRequestException("Email length must be between " +
+                    ValidationConstants.USER_EMAIL_MIN + " and " + ValidationConstants.USER_EMAIL_MAX + " characters");
         }
         if (!request.getEmail().contains("@")) {
             throw new BadRequestException("Invalid email format");
@@ -40,8 +43,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (request.getName() == null || request.getName().isBlank()) {
             throw new BadRequestException("Name must not be blank");
         }
-        if (request.getName().length() < 2 || request.getName().length() > 250) {
-            throw new BadRequestException("Name length must be between 2 and 250 characters");
+        if (request.getName().length() < ValidationConstants.USER_NAME_MIN ||
+                request.getName().length() > ValidationConstants.USER_NAME_MAX) {
+            throw new BadRequestException("Name length must be between " +
+                    ValidationConstants.USER_NAME_MIN + " and " + ValidationConstants.USER_NAME_MAX + " characters");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {

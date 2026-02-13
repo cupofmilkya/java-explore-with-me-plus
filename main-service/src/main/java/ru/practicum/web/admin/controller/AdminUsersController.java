@@ -10,6 +10,7 @@ import ru.practicum.web.admin.service.AdminUserService;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.user.dto.NewUserRequest;
 import ru.practicum.web.user.dto.UserDto;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.List;
 
@@ -30,13 +31,13 @@ public class AdminUsersController {
     @GetMapping
     public ResponseEntity<List<UserDto>> getUsers(
             @RequestParam(required = false) List<Long> ids,
-            @RequestParam(defaultValue = "0") int from,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = ValidationConstants.PAGE_DEFAULT_FROM + "") int from,
+            @RequestParam(defaultValue = ValidationConstants.PAGE_DEFAULT_SIZE + "") int size
     ) {
-        if (from < 0) {
+        if (from < ValidationConstants.PAGE_MIN_FROM) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
-        if (size <= 0) {
+        if (size < ValidationConstants.PAGE_MIN_SIZE) {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
 

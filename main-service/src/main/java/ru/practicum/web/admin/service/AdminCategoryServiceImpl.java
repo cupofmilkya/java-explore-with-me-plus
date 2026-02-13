@@ -15,6 +15,7 @@ import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,8 +33,9 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
         if (dto.getName() == null || dto.getName().isBlank()) {
             throw new BadRequestException("Category name cannot be empty");
         }
-        if (dto.getName().length() > 50) {
-            throw new BadRequestException("Category name length must be between 1 and 50 characters");
+        if (dto.getName().length() > ValidationConstants.CATEGORY_NAME_MAX) {
+            throw new BadRequestException("Category name length must be between 1 and " +
+                    ValidationConstants.CATEGORY_NAME_MAX + " characters");
         }
 
         if (repository.existsByName(dto.getName())) {
@@ -61,8 +63,9 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
         if (dto.getName() == null || dto.getName().isBlank()) {
             throw new BadRequestException("Category name cannot be empty");
         }
-        if (dto.getName().length() > 50) {
-            throw new BadRequestException("Category name length must be between 1 and 50 characters");
+        if (dto.getName().length() > ValidationConstants.CATEGORY_NAME_MAX) {
+            throw new BadRequestException("Category name length must be between 1 and " +
+                    ValidationConstants.CATEGORY_NAME_MAX + " characters");
         }
 
         Category category = repository.findById(id)
@@ -94,10 +97,10 @@ public class AdminCategoryServiceImpl implements AdminCategoryService {
 
     @Override
     public List<CategoryDto> getAll(int from, int size) {
-        if (from < 0) {
+        if (from < ValidationConstants.PAGE_MIN_FROM) {
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
-        if (size <= 0) {
+        if (size < ValidationConstants.PAGE_MIN_SIZE) {
             throw new BadRequestException("Parameter 'size' must be positive");
         }
 

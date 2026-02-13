@@ -19,6 +19,7 @@ import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 import ru.practicum.web.user.repository.UserRepository;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -36,7 +37,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final StatsClient statsClient;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(ValidationConstants.DATE_TIME_FORMAT);
 
     @Override
     public List<EventShortDto> getEvents(Long userId, int from, int size) {
@@ -54,9 +55,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         return events.stream()
                 .map(event -> {
                     EventShortDto dto = EventMapper.toShortDto(event);
-                    dto.setViews(viewsMap.getOrDefault(event.getId(), 0L));
+                    dto.setViews(viewsMap.getOrDefault(event.getId(), ValidationConstants.DEFAULT_VIEWS));
                     dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
-                            event.getConfirmedRequests() : 0L);
+                            event.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -71,7 +72,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .orElseThrow(() -> new NotFoundException("Category with id=" + dto.getCategory() + " was not found"));
 
         LocalDateTime eventDate = parseDateTime(dto.getEventDate());
-        if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
+        if (eventDate.isBefore(LocalDateTime.now().plusHours(ValidationConstants.EVENT_HOURS_BEFORE_START))) {
             throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + dto.getEventDate());
         }
 
@@ -88,8 +89,8 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                 .requestModeration(dto.getRequestModeration() != null ? dto.getRequestModeration() : true)
                 .status(Event.Status.PENDING)
                 .createdOn(LocalDateTime.now())
-                .confirmedRequests(0L)
-                .views(0L)
+                .confirmedRequests(ValidationConstants.DEFAULT_CONFIRMED_REQUESTS)
+                .views(ValidationConstants.DEFAULT_VIEWS)
                 .build();
 
         Event saved = eventRepository.save(event);
@@ -135,7 +136,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
         }
         if (updateRequest.getEventDate() != null) {
             LocalDateTime newEventDate = parseDateTime(updateRequest.getEventDate());
-            if (newEventDate.isBefore(LocalDateTime.now().plusHours(2))) {
+            if (newEventDate.isBefore(LocalDateTime.now().plusHours(ValidationConstants.EVENT_HOURS_BEFORE_START))) {
                 throw new BadRequestException("Field: eventDate. Error: должно содержать дату, которая еще не наступила. Value: " + updateRequest.getEventDate());
             }
             event.setEventDate(newEventDate);
@@ -144,7 +145,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             event.setPaid(updateRequest.getPaid());
         }
         if (updateRequest.getParticipantLimit() != null) {
-            if (updateRequest.getParticipantLimit() < 0) {
+            if (updateRequest.getParticipantLimit() < ValidationConstants.EVENT_PARTICIPANT_LIMIT_MIN) {
                 throw new BadRequestException("Participant limit must be non-negative");
             }
             event.setParticipantLimit(updateRequest.getParticipantLimit());
@@ -189,7 +190,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
             try {
                 return LocalDateTime.parse(dateTimeStr);
             } catch (Exception e2) {
-                throw new IllegalArgumentException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss or ISO format");
+                throw new IllegalArgumentException("Invalid date format. Expected: " + ValidationConstants.DATE_TIME_FORMAT + " or ISO format");
             }
         }
     }
@@ -231,7 +232,7 @@ public class PrivateEventServiceImpl implements PrivateEventService {
 
     private Long getViewsForEvent(Event event) {
         if (event.getId() == null) {
-            return 0L;
+            return ValidationConstants.DEFAULT_VIEWS;
         }
 
         try {
@@ -247,9 +248,9 @@ public class PrivateEventServiceImpl implements PrivateEventService {
                     true
             );
 
-            return stats.isEmpty() ? 0L : stats.getFirst().getHits();
+            return stats.isEmpty() ? ValidationConstants.DEFAULT_VIEWS : stats.getFirst().getHits();
         } catch (Exception e) {
-            return 0L;
+            return ValidationConstants.DEFAULT_VIEWS;
         }
     }
 
