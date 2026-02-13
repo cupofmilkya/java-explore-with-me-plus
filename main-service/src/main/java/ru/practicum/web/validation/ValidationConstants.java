@@ -2,7 +2,8 @@ package ru.practicum.web.validation;
 
 public final class ValidationConstants {
 
-    private ValidationConstants() {}
+    private ValidationConstants() {
+    }
 
     // Event validation
     public static final int EVENT_TITLE_MIN = 3;
