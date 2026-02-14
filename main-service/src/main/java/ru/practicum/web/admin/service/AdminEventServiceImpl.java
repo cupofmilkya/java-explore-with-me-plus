@@ -1,6 +1,7 @@
 package ru.practicum.web.admin.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +26,7 @@ import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -46,6 +48,9 @@ public class AdminEventServiceImpl implements AdminEventService {
                                     int from,
                                     int size) {
 
+        log.info("Запрос списка событий администратором с параметрами: users={}, states={}, categories={}, " +
+                "rangeStart={}, rangeEnd={}, from={}, size={}", users, states, categories, rangeStart, rangeEnd, from, size);
+
         validatePagination(from, size);
 
         Pageable pageable = PageRequest.of(from / size, size);
@@ -64,6 +69,8 @@ public class AdminEventServiceImpl implements AdminEventService {
         );
 
         List<Event> events = eventPage.getContent();
+        log.debug("Найдено {} событий", events.size());
+
         statsService.setViewsForEvents(events);
 
         return events.stream()
@@ -73,6 +80,8 @@ public class AdminEventServiceImpl implements AdminEventService {
 
     @Override
     public EventDto updateEvent(Long eventId, UpdateEventAdminRequest request) {
+        log.info("Обновление события с id={} администратором. Данные: {}", eventId, request);
+
         Event event = getEventOrThrow(eventId);
 
         // Валидация полей
@@ -93,21 +102,27 @@ public class AdminEventServiceImpl implements AdminEventService {
 
         // Обработка состояния
         if (request.getStateAction() != null) {
+            log.debug("Обработка действия со статусом: {}", request.getStateAction());
             handleStateAction(event, request.getStateAction());
         }
 
         Event savedEvent = eventRepository.save(event);
+        log.debug("Событие сохранено с id={}", savedEvent.getId());
+
         Long views = statsService.getViews(savedEvent);
         savedEvent.setViews(views);
 
+        log.info("Событие с id={} успешно обновлено", eventId);
         return EventMapper.toDto(savedEvent);
     }
 
     private void validatePagination(int from, int size) {
         if (from < ValidationConstants.PAGE_MIN_FROM) {
+            log.warn("Некорректное значение параметра from: {}", from);
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
         if (size < ValidationConstants.PAGE_MIN_SIZE) {
+            log.warn("Некорректное значение параметра size: {}", size);
             throw new BadRequestException("Parameter 'size' must be positive");
         }
     }
@@ -121,13 +136,17 @@ public class AdminEventServiceImpl implements AdminEventService {
                     .map(EventStatus::valueOf)
                     .toList();
         } catch (IllegalArgumentException e) {
+            log.warn("Некорректное значение статуса: {}", states);
             throw new BadRequestException("Invalid state value: " + states);
         }
     }
 
     private Event getEventOrThrow(Long eventId) {
         return eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+                .orElseThrow(() -> {
+                    log.warn("Событие с id={} не найдено", eventId);
+                    return new NotFoundException("Event with id=" + eventId + " was not found");
+                });
     }
 
     private ru.practicum.web.admin.entity.Category getCategoryIfPresent(Long categoryId) {
@@ -135,7 +154,10 @@ public class AdminEventServiceImpl implements AdminEventService {
             return null;
         }
         return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + categoryId + " not found"));
+                .orElseThrow(() -> {
+                    log.warn("Категория с id={} не найдена", categoryId);
+                    return new NotFoundException("Category with id=" + categoryId + " not found");
+                });
     }
 
     private void handleStateAction(Event event, String stateAction) {
@@ -143,12 +165,15 @@ public class AdminEventServiceImpl implements AdminEventService {
             case "PUBLISH_EVENT":
                 validator.validatePublishEvent(event);
                 mapperService.applyStateAction(event, stateAction);
+                log.debug("Событие {} опубликовано", event.getId());
                 break;
             case "REJECT_EVENT":
                 validator.validateRejectEvent(event);
                 mapperService.applyStateAction(event, stateAction);
+                log.debug("Событие {} отклонено", event.getId());
                 break;
             default:
+                log.warn("Некорректное действие со статусом: {}", stateAction);
                 throw new BadRequestException("Invalid state action: " + stateAction);
         }
     }

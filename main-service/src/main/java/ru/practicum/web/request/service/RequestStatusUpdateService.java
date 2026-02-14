@@ -1,6 +1,7 @@
 package ru.practicum.web.request.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.web.event.entity.Event;
@@ -15,6 +16,7 @@ import ru.practicum.web.request.repository.ParticipationRequestRepository;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RequestStatusUpdateService {
@@ -29,6 +31,8 @@ public class RequestStatusUpdateService {
             Event event,
             int availableSlots) {
 
+        log.debug("Подтверждение заявок: всего {}, доступно мест {}", requests.size(), availableSlots);
+
         List<ParticipationRequestDto> confirmedList = new ArrayList<>();
         List<ParticipationRequestDto> rejectedList = new ArrayList<>();
 
@@ -38,15 +42,19 @@ public class RequestStatusUpdateService {
                 request.setStatus(RequestStatus.CONFIRMED);
                 confirmedCount++;
                 confirmedList.add(mapperService.toDto(request));
+                log.debug("Заявка {} подтверждена", request.getId());
             } else {
                 request.setStatus(RequestStatus.REJECTED);
                 rejectedList.add(mapperService.toDto(request));
+                log.debug("Заявка {} отклонена (нет мест)", request.getId());
             }
             requestRepository.save(request);
         }
 
         event.setConfirmedRequests(event.getConfirmedRequests() + confirmedCount);
         eventRepository.save(event);
+        log.debug("Количество подтвержденных заявок для события {} увеличено на {}",
+                event.getId(), confirmedCount);
 
         return EventRequestStatusUpdateResult.builder()
                 .confirmedRequests(confirmedList)
@@ -56,12 +64,15 @@ public class RequestStatusUpdateService {
 
     @Transactional
     public EventRequestStatusUpdateResult rejectRequests(List<ParticipationRequest> requests) {
+        log.debug("Отклонение {} заявок", requests.size());
+
         List<ParticipationRequestDto> rejectedList = new ArrayList<>();
 
         for (ParticipationRequest request : requests) {
             request.setStatus(RequestStatus.REJECTED);
             requestRepository.save(request);
             rejectedList.add(mapperService.toDto(request));
+            log.debug("Заявка {} отклонена", request.getId());
         }
 
         return EventRequestStatusUpdateResult.builder()
