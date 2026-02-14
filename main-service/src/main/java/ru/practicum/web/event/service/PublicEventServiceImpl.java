@@ -5,18 +5,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.statsclient.StatsClient;
 import ru.practicum.web.event.dto.EventDto;
 import ru.practicum.web.event.dto.EventShortDto;
 import ru.practicum.web.event.entity.Event;
+import ru.practicum.web.event.entity.EventStatus;
 import ru.practicum.web.event.mapper.EventMapper;
 import ru.practicum.web.event.repository.EventRepository;
 import ru.practicum.web.event.repository.EventSpecification;
 import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.NotFoundException;
 import jakarta.transaction.Transactional;
+import ru.practicum.web.validation.ValidationConstants;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -35,15 +38,21 @@ public class PublicEventServiceImpl implements PublicEventService {
 
     private final EventRepository eventRepository;
     private final StatsClient statsClient;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern(ValidationConstants.DATE_TIME_FORMAT);
 
     @Override
     public EventDto getEvent(Long id) {
-        Event event = eventRepository.findByIdAndStatus(id, Event.Status.PUBLISHED)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
+        log.info("Запрос события с id={}", id);
+
+        Event event = eventRepository.findByIdAndStatus(id, EventStatus.PUBLISHED)
+                .orElseThrow(() -> {
+                    log.warn("Опубликованное событие с id={} не найдено", id);
+                    return new NotFoundException("Event with id=" + id + " was not found");
+                });
 
         Long views = getViewsForEvent(event);
         event.setViews(views + 1);
+        log.debug("Просмотров события {}: {}", id, views + 1);
 
         EventDto dto = EventMapper.toDto(event);
         dto.setViews(views + 1);
@@ -63,36 +72,46 @@ public class PublicEventServiceImpl implements PublicEventService {
             int from,
             int size
     ) {
-        if (from < 0) {
+        log.info("Публичный запрос событий с параметрами: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, " +
+                "onlyAvailable={}, sort={}, from={}, size={}", text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+
+        if (from < ValidationConstants.PAGE_MIN_FROM) {
+            log.warn("Некорректное значение from: {}", from);
             throw new BadRequestException("Parameter 'from' must be non-negative");
         }
 
-        int actualSize = size > 0 ? size : 10;
-
+        int actualSize = size > 0 ? size : ValidationConstants.PAGE_DEFAULT_SIZE;
         int page = from / actualSize;
-        Pageable pageable = PageRequest.of(page, actualSize);
-
-        log.info("Getting events with from={}, actualSize={}, page={}", from, actualSize, page);
+        Pageable pageable = PageRequest.of(page, actualSize, getSort(sort));
 
         LocalDateTime startDateTime = null;
         LocalDateTime endDateTime = null;
 
         if (rangeStart != null && !rangeStart.isBlank()) {
-            startDateTime = parseDateTime(rangeStart);
+            try {
+                startDateTime = parseDateTime(rangeStart);
+            } catch (Exception e) {
+                log.warn("Ошибка парсинга даты начала: {}", rangeStart);
+                throw new BadRequestException("Invalid date format for rangeStart");
+            }
         }
 
         if (rangeEnd != null && !rangeEnd.isBlank()) {
-            endDateTime = parseDateTime(rangeEnd);
+            try {
+                endDateTime = parseDateTime(rangeEnd);
+            } catch (Exception e) {
+                log.warn("Ошибка парсинга даты окончания: {}", rangeEnd);
+                throw new BadRequestException("Invalid date format for rangeEnd");
+            }
         }
 
-        if (startDateTime != null && endDateTime != null &&
-                startDateTime.isAfter(endDateTime)) {
+        if (startDateTime != null && endDateTime != null && startDateTime.isAfter(endDateTime)) {
+            log.warn("Дата начала {} позже даты окончания {}", rangeStart, rangeEnd);
             throw new BadRequestException("rangeStart must be before rangeEnd");
         }
 
         Page<Event> eventPage = eventRepository.findAll(
                 EventSpecification.publicEvents(
-                        Event.Status.PUBLISHED,
                         text,
                         categories,
                         paid,
@@ -104,7 +123,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         );
 
         List<Event> events = eventPage.getContent();
-        log.info("Found {} events", events.size());
+        log.info("Найдено {} событий", events.size());
 
         if (events.isEmpty()) {
             return new ArrayList<>();
@@ -114,30 +133,36 @@ public class PublicEventServiceImpl implements PublicEventService {
 
         List<EventShortDto> result = events.stream()
                 .map(event -> {
-                    Long views = viewsMap.getOrDefault(event.getId(), 0L);
+                    Long views = viewsMap.getOrDefault(event.getId(), ValidationConstants.DEFAULT_VIEWS);
                     EventShortDto dto = EventMapper.toShortDto(event);
                     dto.setViews(views);
                     dto.setConfirmedRequests(event.getConfirmedRequests() != null ?
-                            event.getConfirmedRequests() : 0L);
+                            event.getConfirmedRequests() : ValidationConstants.DEFAULT_CONFIRMED_REQUESTS);
                     return dto;
                 })
                 .collect(Collectors.toList());
 
-        if (sort != null) {
-            if ("EVENT_DATE".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getEventDate() == null || e2.getEventDate() == null) return 0;
-                    return e1.getEventDate().compareTo(e2.getEventDate());
-                });
-            } else if ("VIEWS".equals(sort)) {
-                result.sort((e1, e2) -> {
-                    if (e1.getViews() == null || e2.getViews() == null) return 0;
-                    return e1.getViews().compareTo(e2.getViews());
-                });
-            }
+        // Сортировка по просмотрам в Java (так как views - transient поле)
+        if ("VIEWS".equals(sort)) {
+            result.sort((e1, e2) -> {
+                if (e1.getViews() == null || e2.getViews() == null) return 0;
+                return e1.getViews().compareTo(e2.getViews());
+            });
+            log.debug("Выполнена сортировка по просмотрам");
         }
 
         return result;
+    }
+
+    private Sort getSort(String sort) {
+        if (sort == null) {
+            return Sort.unsorted();
+        }
+        if ("EVENT_DATE".equals(sort)) {
+            log.debug("Сортировка по дате события");
+            return Sort.by(Sort.Direction.ASC, "eventDate");
+        }
+        return Sort.unsorted();
     }
 
     private Map<Long, Long> getViewsMap(List<Event> events) {
@@ -163,15 +188,16 @@ public class PublicEventServiceImpl implements PublicEventService {
             );
 
             if (stats == null || stats.isEmpty()) {
+                log.debug("Статистика просмотров не найдена");
                 return events.stream()
                         .filter(e -> e.getId() != null)
                         .collect(Collectors.toMap(
                                 Event::getId,
-                                e -> 0L
+                                e -> ValidationConstants.DEFAULT_VIEWS
                         ));
             }
 
-            return stats.stream()
+            Map<Long, Long> viewsMap = stats.stream()
                     .filter(stat -> stat != null && stat.getUri() != null)
                     .map(stat -> {
                         Long id = extractEventIdFromUri(stat.getUri());
@@ -184,20 +210,28 @@ public class PublicEventServiceImpl implements PublicEventService {
                             (a, b) -> a
                     ));
 
+            // Добавляем события без статистики
+            events.stream()
+                    .filter(e -> e.getId() != null && !viewsMap.containsKey(e.getId()))
+                    .forEach(e -> viewsMap.put(e.getId(), ValidationConstants.DEFAULT_VIEWS));
+
+            log.debug("Получена статистика для {} событий", viewsMap.size());
+            return viewsMap;
+
         } catch (Exception e) {
-            log.error("Error getting stats", e);
+            log.error("Ошибка получения статистики просмотров: {}", e.getMessage());
             return events.stream()
                     .filter(ee -> ee.getId() != null)
                     .collect(Collectors.toMap(
                             Event::getId,
-                            ee -> 0L
+                            ee -> ValidationConstants.DEFAULT_VIEWS
                     ));
         }
     }
 
     private Long getViewsForEvent(Event event) {
         if (event == null || event.getId() == null) {
-            return 0L;
+            return ValidationConstants.DEFAULT_VIEWS;
         }
 
         try {
@@ -214,12 +248,12 @@ public class PublicEventServiceImpl implements PublicEventService {
             );
 
             if (stats == null || stats.isEmpty()) {
-                return 0L;
+                return ValidationConstants.DEFAULT_VIEWS;
             }
             return stats.get(0).getHits();
         } catch (Exception e) {
-            log.error("Error getting views for event {}: {}", event.getId(), e.getMessage());
-            return 0L;
+            log.error("Ошибка получения просмотров для события {}: {}", event.getId(), e.getMessage());
+            return ValidationConstants.DEFAULT_VIEWS;
         }
     }
 
@@ -234,7 +268,7 @@ public class PublicEventServiceImpl implements PublicEventService {
             }
             return null;
         } catch (Exception e) {
-            log.error("Error extracting event id from uri: {}", uri, e);
+            log.error("Ошибка извлечения id из uri: {}", uri);
             return null;
         }
     }
@@ -243,7 +277,7 @@ public class PublicEventServiceImpl implements PublicEventService {
         try {
             return LocalDateTime.parse(dateTimeStr, FORMATTER);
         } catch (DateTimeParseException e) {
-            throw new BadRequestException("Invalid date format. Expected: yyyy-MM-dd HH:mm:ss");
+            throw new BadRequestException("Invalid date format. Expected: " + ValidationConstants.DATE_TIME_FORMAT);
         }
     }
 }

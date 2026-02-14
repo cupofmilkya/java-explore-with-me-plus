@@ -1,6 +1,7 @@
 package ru.practicum.web.admin.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -11,109 +12,109 @@ import ru.practicum.web.admin.dto.NewCategoryDto;
 import ru.practicum.web.admin.entity.Category;
 import ru.practicum.web.admin.mapper.CategoryMapper;
 import ru.practicum.web.admin.repository.CategoryRepository;
+import ru.practicum.web.admin.validation.CategoryValidator;
 import ru.practicum.web.event.repository.EventRepository;
-import ru.practicum.web.exception.BadRequestException;
 import ru.practicum.web.exception.ConflictException;
 import ru.practicum.web.exception.NotFoundException;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class AdminCategoryServiceImpl implements AdminCategoryService {
 
-    private final CategoryRepository repository;
+    private final CategoryRepository categoryRepository;
     private final EventRepository eventRepository;
+    private final CategoryValidator validator;
 
     @Override
     public CategoryDto create(NewCategoryDto dto) {
-        if (dto.getName() == null || dto.getName().isBlank()) {
-            throw new BadRequestException("Category name cannot be empty");
-        }
-        if (dto.getName().length() > 50) {
-            throw new BadRequestException("Category name length must be between 1 and 50 characters");
-        }
+        log.info("Создание новой категории: {}", dto.getName());
 
-        if (repository.existsByName(dto.getName())) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
-        }
+        validator.validateCategoryName(dto.getName());
+        validator.checkCategoryNameUnique(dto.getName());
 
         try {
             Category category = Category.builder()
                     .name(dto.getName())
                     .build();
-            return CategoryMapper.toDto(repository.save(category));
+            Category saved = categoryRepository.save(category);
+            log.info("Категория создана с id={}", saved.getId());
+            return CategoryMapper.toDto(saved);
         } catch (DataIntegrityViolationException e) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
+            log.warn("Ошибка уникальности при создании категории: {}", dto.getName());
+            validator.checkCategoryNameUnique(dto.getName());
+            throw e;
         }
     }
 
     @Override
     public CategoryDto update(Long id, CategoryDto dto) {
-        if (dto.getName() == null || dto.getName().isBlank()) {
-            throw new BadRequestException("Category name cannot be empty");
-        }
-        if (dto.getName().length() > 50) {
-            throw new BadRequestException("Category name length must be between 1 and 50 characters");
-        }
+        log.info("Обновление категории с id={}: новое название '{}'", id, dto.getName());
 
-        Category category = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
+        validator.validateCategoryName(dto.getName());
+        validator.validateCategoryExists(id);
+        validator.checkCategoryNameUniqueForUpdate(dto.getName(), id);
 
-        if (!category.getName().equals(dto.getName()) &&
-                repository.existsByNameAndIdNot(dto.getName(), id)) {
-            throw new ConflictException(
-                    "could not execute statement; SQL [n/a]; constraint [uq_category_name]; " +
-                            "nested exception is org.hibernate.exception.ConstraintViolationException: could not execute statement"
-            );
-        }
-
+        Category category = getCategoryOrThrow(id);
+        String oldName = category.getName();
         category.setName(dto.getName());
-        return CategoryMapper.toDto(repository.save(category));
+
+        Category updated = categoryRepository.save(category);
+        log.info("Категория с id={} обновлена: '{}' -> '{}'", id, oldName, dto.getName());
+        return CategoryMapper.toDto(updated);
     }
 
     @Override
     public void delete(Long id) {
-        Category category = repository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
+        log.info("Удаление категории с id={}", id);
 
-        if (eventRepository.existsByCategoryId(id)) {
-            throw new ConflictException("The category is not empty");
-        }
+        validator.validateCategoryExists(id);
+        checkCategoryNotInUse(id);
 
-        repository.delete(category);
+        categoryRepository.deleteById(id);
+        log.info("Категория с id={} удалена", id);
     }
 
     @Override
     public List<CategoryDto> getAll(int from, int size) {
-        if (from < 0) {
-            throw new BadRequestException("Parameter 'from' must be non-negative");
-        }
-        if (size <= 0) {
-            throw new BadRequestException("Parameter 'size' must be positive");
-        }
+        log.debug("Запрос списка категорий: from={}, size={}", from, size);
+
+        validator.validatePagination(from, size);
 
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
-        return repository.findAll(pageable)
+        List<CategoryDto> categories = categoryRepository.findAll(pageable)
                 .stream()
                 .map(CategoryMapper::toDto)
                 .collect(Collectors.toList());
+
+        log.debug("Найдено {} категорий", categories.size());
+        return categories;
     }
 
     @Override
     public CategoryDto getById(Long id) {
-        return repository.findById(id)
-                .map(CategoryMapper::toDto)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + id + " was not found"));
+        log.debug("Запрос категории с id={}", id);
+        return CategoryMapper.toDto(getCategoryOrThrow(id));
+    }
+
+    private Category getCategoryOrThrow(Long id) {
+        return categoryRepository.findById(id)
+                .orElseThrow(() -> {
+                    log.warn("Категория с id={} не найдена", id);
+                    return new NotFoundException("Category with id=" + id + " was not found");
+                });
+    }
+
+    private void checkCategoryNotInUse(Long categoryId) {
+        if (eventRepository.existsByCategoryId(categoryId)) {
+            log.warn("Попытка удалить категорию с id={}, которая используется в событиях", categoryId);
+            throw new ConflictException("The category is not empty");
+        }
     }
 }

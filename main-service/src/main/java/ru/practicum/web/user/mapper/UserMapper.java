@@ -21,4 +21,14 @@ public class UserMapper {
                 user.getEmail()
         );
     }
+
+    public static User fromNewUserRequest(ru.practicum.web.user.dto.NewUserRequest request) {
+        if (request == null) {
+            return null;
+        }
+        return User.builder()
+                .name(request.getName())
+                .email(request.getEmail())
+                .build();
+    }
 }

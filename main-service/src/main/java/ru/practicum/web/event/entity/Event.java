@@ -54,7 +54,7 @@ public class Event {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status = Status.PENDING;
+    private EventStatus status = EventStatus.PENDING;
 
     @Column(name = "created_on", nullable = false)
     private LocalDateTime createdOn;
@@ -67,8 +67,4 @@ public class Event {
 
     @Transient
     private Long views = 0L;
-
-    public enum Status {
-        PENDING, PUBLISHED, CANCELED
-    }
 }
