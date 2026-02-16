@@ -47,6 +47,18 @@
     {
       "description": "API для работы с подборками событий",
       "name": "Admin: Подборки событий"
+    },
+    {
+      "description": "Публичный API для работы с комментариями к событиям",
+      "name": "Public: Комментарии"
+    },
+    {
+      "description": "Закрытый API для работы с комментариями пользователя",
+      "name": "Private: Комментарии"
+    },
+    {
+      "description": "Административный API для модерации комментариев",
+      "name": "Admin: Комментарии"
     }
   ],
   "paths": {
@@ -1983,6 +1995,151 @@
           "Private: Запросы на участие"
         ]
       }
+    },
+    "/events/{eventId}/comments": {
+      "get": {
+        "summary": "Список одобренных комментариев события",
+        "description": "Возвращает список комментариев к опубликованному событию в статусе APPROVED с пагинацией",
+        "operationId": "getEventApprovedComments",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "description": "id события",
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Индекс первого элемента (для пагинации)",
+            "schema": { "type": "integer", "format": "int32", "default": 0, "minimum": 0 }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "description": "Количество элементов для отображения",
+            "schema": { "type": "integer", "format": "int32", "default": 10, "minimum": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Список комментариев",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/CommentDto" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Запрос составлен некорректно",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+          },
+          "404": {
+            "description": "Событие не найдено или не опубликовано",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+          }
+        },
+        "tags": ["Public: Комментарии"]
+      }
+    },
+    "/events/{eventId}/comments/{commentId}": {
+      "get": {
+        "summary": "Получение одобренного комментария по id",
+        "description": "Публичный доступ только к комментариям в статусе APPROVED",
+        "operationId": "getApprovedCommentById",
+        "parameters": [
+          {"name": "eventId", "in": "path", "required": true, "description": "id события", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "commentId", "in": "path", "required": true, "description": "id комментария", "schema": {"type": "integer", "format": "int64"}}
+        ],
+        "responses": {
+          "200": {"description": "Комментарий найден", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommentDto"}}}},
+          "404": {"description": "Комментарий не найден или не одобрен", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}}
+        },
+        "tags": ["Public: Комментарии"]
+      }
+    },
+    "/users/{userId}/events/{eventId}/comments": {
+      "post": {
+        "summary": "Создание комментария к событию",
+        "description": "Создаёт комментарий от имени пользователя. Статус модерации будет PENDING",
+        "operationId": "addComment",
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "description": "id пользователя", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "eventId", "in": "path", "required": true, "description": "id события", "schema": {"type": "integer", "format": "int64"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Данные нового комментария",
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewCommentDto"}}}
+        },
+        "responses": {
+          "201": {"description": "Комментарий создан", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommentDto"}}}},
+          "400": {"description": "Запрос составлен некорректно", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}},
+          "404": {"description": "Пользователь или событие не найдены", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}}
+        },
+        "tags": ["Private: Комментарии"]
+      }
+    },
+    "/users/{userId}/events/{eventId}/comments/{commentId}": {
+      "patch": {
+        "summary": "Обновление собственного комментария",
+        "description": "Обновляет текст комментария. После обновления комментарий снова переходит в статус PENDING",
+        "operationId": "updateOwnComment",
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "description": "id пользователя", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "eventId", "in": "path", "required": true, "description": "id события", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "commentId", "in": "path", "required": true, "description": "id комментария", "schema": {"type": "integer", "format": "int64"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Новый текст комментария",
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateCommentDto"}}}
+        },
+        "responses": {
+          "200": {"description": "Комментарий обновлён", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommentDto"}}}},
+          "400": {"description": "Запрос составлен некорректно", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}},
+          "404": {"description": "Комментарий не найден или недоступен для пользователя", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}}
+        },
+        "tags": ["Private: Комментарии"]
+      },
+      "delete": {
+        "summary": "Удаление собственного комментария",
+        "operationId": "deleteOwnComment",
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "description": "id пользователя", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "eventId", "in": "path", "required": true, "description": "id события", "schema": {"type": "integer", "format": "int64"}},
+          {"name": "commentId", "in": "path", "required": true, "description": "id комментария", "schema": {"type": "integer", "format": "int64"}}
+        ],
+        "responses": {
+          "204": {"description": "Комментарий удалён"},
+          "404": {"description": "Комментарий не найден или недоступен для пользователя", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}}
+        },
+        "tags": ["Private: Комментарии"]
+      }
+    },
+    "/admin/events/comments": {
+      "put": {
+        "summary": "Модерация комментария (обновление статуса)",
+        "description": "Администратор устанавливает статус модерации комментария",
+        "operationId": "moderateComment",
+        "requestBody": {
+          "required": true,
+          "description": "Данные для модерации комментария",
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdminCommentModerateDto"}}}
+        },
+        "responses": {
+          "200": {"description": "Статус обновлён", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CommentDto"}}}},
+          "400": {"description": "Запрос составлен некорректно", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}},
+          "404": {"description": "Комментарий не найден", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApiError"}}}}
+        },
+        "tags": ["Admin: Комментарии"]
+      }
     }
   },
   "components": {
@@ -2782,6 +2939,110 @@
           }
         },
         "description": "Данные для изменения информации о событии. Если поле в запросе не указано (равно null) - значит изменение этих данных не треубется."
+      },
+      "CommentModerationStatus": {
+        "type": "string",
+        "description": "Статус модерации комментария",
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "REJECTED"
+        ]
+      },
+      "CommentDto": {
+        "required": [
+          "id",
+          "author",
+          "text",
+          "createdOn",
+          "moderationStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Идентификатор комментария",
+            "format": "int64",
+            "readOnly": true,
+            "example": 1
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserShortDto"
+          },
+          "eventId": {
+            "type": "integer",
+            "description": "Идентификатор события",
+            "format": "int64",
+            "example": 1
+          },
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string",
+            "description": "Текст комментария",
+            "example": "Отличное событие!"
+          },
+          "createdOn": {
+            "type": "string",
+            "description": "Дата и время создания комментария (в формате \"yyyy-MM-dd HH:mm:ss\")",
+            "example": "2026-02-16 19:51:00"
+          },
+          "moderationStatus": {
+            "$ref": "#/components/schemas/CommentModerationStatus"
+          }
+        },
+        "description": "Комментарий к событию"
+      },
+      "NewCommentDto": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string",
+            "description": "Текст нового комментария",
+            "example": "Отличное событие!"
+          }
+        },
+        "description": "Данные для создания комментария"
+      },
+      "UpdateCommentDto": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string",
+            "description": "Новый текст комментария",
+            "example": "Исправленный текст комментария"
+          }
+        },
+        "description": "Данные для обновления комментария"
+      },
+      "AdminCommentModerateDto": {
+        "required": [
+          "commentId",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "commentId": {
+            "type": "integer",
+            "description": "Идентификатор комментария",
+            "format": "int64",
+            "example": 1
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommentModerationStatus"
+          }
+        },
+        "description": "Данные для модерации комментария"
       },
       "UserDto": {
         "required": [

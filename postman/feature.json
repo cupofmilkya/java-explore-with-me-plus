@@ -1,0 +1,281 @@
+{
+  "info": {
+    "name": "EWM Main Service - Comments",
+    "_postman_id": "e3bd3a2c-1b2f-4a74-9f6e-cc1b2b9b0abc",
+    "description": "Коллекция Postman для проверки эндпоинтов комментариев (публичные, приватные, админ). Вставьте реальные идентификаторы userId, eventId, commentId при выполнении запросов.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Public - List approved comments for event",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/events/{{eventId}}/comments?from=0&size=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{{eventId}}",
+            "comments"
+          ],
+          "query": [
+            {"key": "from", "value": "0"},
+            {"key": "size", "value": "10"}
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[200] Должен вернуть список комментариев', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Ответ - массив', function () {",
+              "  pm.expect(Array.isArray(pm.response.json())).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public - Get approved comment by id",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/events/{{eventId}}/comments/{{commentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{{eventId}}",
+            "comments",
+            "{{commentId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[200] Должен вернуть комментарий', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Комментарий содержит id', function () {",
+              "  pm.expect(pm.response.json()).to.have.property('id');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Private - Create comment",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Отличное событие!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users/{{userId}}/events/{{eventId}}/comments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "{{userId}}",
+            "events",
+            "{{eventId}}",
+            "comments"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[201] Комментарий создан', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Ответ содержит статус модерации', function () {",
+              "  pm.expect(pm.response.json()).to.have.property('moderationStatus');",
+              "});",
+              "pm.variables.set('createdCommentId', pm.response.json().id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Moderate comment (APPROVE)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"commentId\": {{createdCommentId}},\n  \"status\": \"APPROVED\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/events/comments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "events",
+            "comments"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[200] Статус модерации обновлён', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Комментарий одобрен', function () {",
+              "  pm.expect(pm.response.json().moderationStatus).to.eql('APPROVED');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public - Get approved comment by id (after approve)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/events/{{eventId}}/comments/{{createdCommentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{{eventId}}",
+            "comments",
+            "{{createdCommentId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[200] Комментарий доступен публично после одобрения', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Private - Update own comment (re-moderation)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Исправленный текст комментария\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/users/{{userId}}/events/{{eventId}}/comments/{{createdCommentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "{{userId}}",
+            "events",
+            "{{eventId}}",
+            "comments",
+            "{{createdCommentId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[200] Комментарий обновлён и снова отправлен на модерацию', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Статус модерации стал PENDING', function () {",
+              "  pm.expect(pm.response.json().moderationStatus).to.eql('PENDING');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Private - Delete own comment",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/users/{{userId}}/events/{{eventId}}/comments/{{createdCommentId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "users",
+            "{{userId}}",
+            "events",
+            "{{eventId}}",
+            "comments",
+            "{{createdCommentId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('[204] Комментарий удалён', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080"},
+    {"key": "userId", "value": "1"},
+    {"key": "eventId", "value": "1"},
+    {"key": "commentId", "value": "1"}
+  ]
+}
