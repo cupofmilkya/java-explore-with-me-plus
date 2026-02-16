@@ -5,6 +5,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.dto.EndpointHitDto;
@@ -18,6 +19,7 @@ import java.util.List;
 
 /**
  * Реализация StatsClient на основе RestTemplate.
+ * Важно: параметры дат должны быть URL-кодированы, формат строго "yyyy-MM-dd HH:mm:ss".
  */
 public class RestStatsClient implements StatsClient {
 
@@ -30,7 +32,7 @@ public class RestStatsClient implements StatsClient {
         Assert.notNull(restTemplate, "restTemplate must not be null");
         Assert.hasText(baseUrl, "baseUrl must not be blank");
         this.restTemplate = restTemplate;
-        // Strip trailing slash to avoid double slashes when building URLs
+        // Удаляем завершающий слэш, чтобы избежать двойных слэшей при сборке URL
         if (baseUrl.endsWith("/")) {
             this.baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         } else {
@@ -45,7 +47,11 @@ public class RestStatsClient implements StatsClient {
                 .path("/hit")
                 .build()
                 .toUri();
-        restTemplate.postForLocation(uri, dto);
+        try {
+            restTemplate.postForLocation(uri, dto);
+        } catch (RestClientException ex) {
+            throw new StatsClientException("Ошибка вызова POST /hit: " + ex.getMessage(), ex);
+        }
     }
 
     @Override
@@ -65,16 +71,20 @@ public class RestStatsClient implements StatsClient {
             }
         }
 
-        URI uri = builder.build(true).toUri(); // true -> encode URI components
+        URI uri = builder.build(true).toUri(); // true -> кодировать компоненты URI
 
-        ResponseEntity<List<ViewStatsDto>> response = restTemplate.exchange(
-                uri,
-                HttpMethod.GET,
-                HttpEntity.EMPTY,
-                new ParameterizedTypeReference<List<ViewStatsDto>>() {}
-        );
+        try {
+            ResponseEntity<List<ViewStatsDto>> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    new ParameterizedTypeReference<List<ViewStatsDto>>() {}
+            );
 
-        List<ViewStatsDto> body = response.getBody();
-        return body != null ? body : new ArrayList<>();
+            List<ViewStatsDto> body = response.getBody();
+            return body != null ? body : new ArrayList<>();
+        } catch (RestClientException ex) {
+            throw new StatsClientException("Ошибка вызова GET /stats: " + ex.getMessage(), ex);
+        }
     }
 }
